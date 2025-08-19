@@ -77,6 +77,19 @@ function processCommand(command) {
       };
 
     default:
+      // Check if it's a chat message
+      if (cmd.startsWith("chat:")) {
+        const message = cmd.substring(5); // Remove "chat:" prefix
+        console.log(`Chat message received: ${message}`);
+
+        // Echo the message back (you can add more sophisticated chat logic here)
+        return {
+          type: "chat",
+          message: `Echo: ${message}`,
+          timestamp: Date.now(),
+        };
+      }
+
       return {
         status: "error",
         message: `Unknown command: ${cmd}`,

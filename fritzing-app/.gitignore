@@ -2,6 +2,8 @@
 .qmake.cache
 .qmake.stash
 
+/.cache*
+
 Makefile*
 
 phoenix.pro.user
@@ -61,3 +63,4 @@ ehthumbs.db
 Thumbs.db
 .bash_history
 saved_state
+
