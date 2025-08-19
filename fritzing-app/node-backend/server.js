@@ -3,6 +3,67 @@
 const readline = require("readline");
 const fs = require("fs");
 const path = require("path");
+require("dotenv").config({ path: path.join(__dirname, ".env") });
+const { OpenAI } = require("openai");
+
+const SYSTEM_INSTRUCTION = `You are a teacher assistant in an online interaction prototyping class. The class utilize a tool called "BlinkBoard"; a breadboard with built-in LEDs in each row that can light up to signify to the user which row of the board the instructor is referring to. Each connection hole in the BlinkBoard has a specific coordinate in the form of [row, column]. the coordinate maps to the following schema on the Blinkboard;
+Blinkboard Schematics
+
+[1, 1] [1, 2] [1, 3] [1, 4] [1, 5] | [26, 1] [26, 2] [26, 3] [26, 4] [26, 5]
+[2, 1] [2, 2] [2, 3] [2, 4] [2, 5] | [27, 1] [27, 2] [27, 3] [27, 4] [27, 5]
+[3, 1] [3, 2] [3, 3] [3, 4] [3, 5] | [28, 1] [28, 2] [28, 3] [28, 4] [28, 5]
+. .
+. .
+. .
+[24, 1] [24, 2] [24, 3] [24, 4] [24, 5] | [49, 1] [49, 2] [49, 3] [49, 4] [49, 5]
+[25, 1] [25, 2] [25, 3] [25, 4] [25, 5] | [50, 1] [50, 2] [50, 3] [50, 4] [50, 5]
+
+where [51, 1] is the positive rail and [52, 1] is a negative rail. The number for the positive and negative rails are just for annotations in the code representation of the circuit, you should only call them positive and negative rail and you should NOT call them by their number. The same row of the breadboard is connected.
+
+the blinkboard also has a built-in analog and digital I/O pins that can be used to your advantage.
+- pins A0, A1, A2 can be used to sensing voltage at various point in the circuit in relative to ground.
+
+Your job is to help the student debug the circuit using your understanding of the circuit
+`;
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+let openai_chat_history = [];
+let schematics;
+
+let create_param = {
+  // model: 'o4-mini',
+  model: "gpt-4o-mini",
+  input: openai_chat_history,
+  // stream: true,
+  // tools,
+};
+
+function update_schematics(netlist) {
+  schematics = netlist;
+}
+
+async function send_openai_message(message) {
+  // if (openai_chat_history.length == 0) {
+  //   openai_chat_history.push({
+  //     role: "developer",
+  //     content: SYSTEM_INSTRUCTION,
+  //   });
+  // }
+
+  // let query_text = `${prompt} \n Add any test if necessary. You can explain the test in your reply but you don't have to mention some trivial details like test_key`;
+  let query_text = message;
+
+  openai_chat_history.push({
+    role: "user",
+    content: query_text,
+  });
+
+  const response = await openai.responses.create(create_param);
+  return response.output[0].content[0].text;
+}
 
 // Create readline interface for stdin/stdout communication
 const rl = readline.createInterface({
@@ -15,13 +76,13 @@ console.log("BlinkBoard Node.js Backend Started");
 console.log("Waiting for commands from Qt frontend...");
 
 // Handle incoming commands from Qt
-rl.on("line", (line) => {
+rl.on("line", async (line) => {
   try {
     const command = JSON.parse(line);
     console.log(`Received command: ${command.command}`);
 
     // Process the command
-    const response = processCommand(command);
+    const response = await processCommand(command);
 
     // Send response back to Qt
     console.log(JSON.stringify(response));
@@ -37,7 +98,7 @@ rl.on("line", (line) => {
 });
 
 // Process different commands
-function processCommand(command) {
+async function processCommand(command) {
   const { command: cmd, timestamp } = command;
 
   switch (cmd) {
@@ -76,16 +137,25 @@ function processCommand(command) {
         timestamp: Date.now(),
       };
 
+    case "update_schematics":
+      update_schematics(command.netlist);
+      return {
+        status: "success",
+        message: command.netlist,
+        timestamp: Date.now(),
+      };
+
     default:
       // Check if it's a chat message
       if (cmd.startsWith("chat:")) {
         const message = cmd.substring(5); // Remove "chat:" prefix
         console.log(`Chat message received: ${message}`);
 
+        const response = await send_openai_message(message);
         // Echo the message back (you can add more sophisticated chat logic here)
         return {
           type: "chat",
-          message: `Echo: ${message}`,
+          message: `${response}`,
           timestamp: Date.now(),
         };
       }
