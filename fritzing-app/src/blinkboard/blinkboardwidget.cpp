@@ -8,44 +8,84 @@
 #include <QDebug>
 #include <QDir>
 #include <QFileInfo>
+#include <QDomDocument>
+#include <QDomElement>
+#include <QHash>
+#include <QList>
+#include <QPointer>
+
+// Forward declarations for sketch-related classes
+class MainWindow;
+class SketchAreaWidget;
+class SketchWidget;
+class BreadboardSketchWidget;
+class SchematicSketchWidget;
+class ConnectorItem;
+class ErcData;
+
+// Include the actual headers
+#include "../mainwindow/mainwindow.h"
+#include "../mainwindow/sketchareawidget.h"
+#include "../sketch/sketchwidget.h"
+#include "../sketch/breadboardsketchwidget.h"
+#include "../sketch/schematicsketchwidget.h"
+#include "../connectors/connectoritem.h"
+#include "../connectors/ercdata.h"
+#include "../viewlayer.h"
 
 BlinkBoardWidget::BlinkBoardWidget(QWidget *parent)
     : QScrollArea(parent), m_actionButton(new QPushButton(tr("Connect to Node.js Backend"))),
-      m_mainLayout(new QVBoxLayout()), m_groupBox(new QGroupBox("BlinkBoard Chat")),
+      m_mainLayout(new QVBoxLayout()),
       m_nodeProcess(new QProcess(this)),
       m_chatDisplay(new QTextEdit()),
       m_messageInput(new QLineEdit()),
       m_sendButton(new QPushButton("Send")),
+      m_updateSchematicsButton(new QPushButton("Update Schematics")),
       m_inputLayout(new QHBoxLayout()) {
 
   auto frame = new QFrame(this);
 
-  m_mainLayout->setSizeConstraint(QLayout::SetMinAndMaxSize);
+  m_mainLayout->setSizeConstraint(QLayout::SetMinAndMaxSize); // Remove size constraint
   m_mainLayout->setObjectName("BlinkBoardFrame");
-
+  m_mainLayout->setContentsMargins(0, 0, 0, 0); // Remove margins to use full width
+  
   // Setup chat display
   m_chatDisplay->setReadOnly(true);
-  m_chatDisplay->setMaximumHeight(200);
+  m_chatDisplay->setMinimumWidth(400); // Set minimum width
   m_chatDisplay->setPlaceholderText("Chat messages will appear here...");
-  m_chatDisplay->setStyleSheet("QTextEdit { background-color: #f8f9fa; border: 1px solid #dee2e6; }");
+  m_chatDisplay->setStyleSheet("QTextEdit { background-color:rgb(243, 243, 243); border: 1px solid #b1b1b1; border-radius: 0px; padding: 5px; font-family: 'Droid Sans'; font-size: 11px; color: #323232; }");
+  m_chatDisplay->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 
   // Setup message input
   m_messageInput->setPlaceholderText("Type your message here...");
-  m_messageInput->setStyleSheet("QLineEdit { padding: 5px; border: 1px solid #ced4da; border-radius: 3px; }");
+  m_messageInput->setMinimumWidth(300); // Set minimum width
+  m_messageInput->setStyleSheet("QLineEdit { padding: 5px; border: 1px solid #b1b1b1; border-radius: 0px; background: #ececec; color: #323232; font-family: 'Droid Sans'; font-size: 11px; } QLineEdit:focus { border: 1px solid #f23926; }");
+  m_messageInput->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
 
   // Setup send button
-  m_sendButton->setStyleSheet("QPushButton { padding: 5px 15px; background-color: #007bff; color: white; border: none; border-radius: 3px; } QPushButton:hover { background-color: #0056b3; }");
+  m_sendButton->setStyleSheet("QPushButton { padding: 5px 15px; background: #ececec; color: #323232; border: 1px solid #b1b1b1; border-radius: 0px; font-family: 'Droid Sans'; font-size: 11px; } QPushButton:hover { background: #666666; color: #ffffff; } QPushButton:pressed { background: #f23926; color: #d9d9d9; }");
+  m_sendButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+
+  // Setup update schematics button
+  m_updateSchematicsButton->setStyleSheet("QPushButton { padding: 5px 15px; background: #ececec; color: #323232; border: 1px solid #b1b1b1; border-radius: 0px; font-family: 'Droid Sans'; font-size: 11px; } QPushButton:hover { background: #666666; color: #ffffff; } QPushButton:pressed { background: #f23926; color: #d9d9d9; }");
+  m_updateSchematicsButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
 
   // Setup input layout
   m_inputLayout->addWidget(m_messageInput);
   m_inputLayout->addWidget(m_sendButton);
+  m_inputLayout->addWidget(m_updateSchematicsButton);
+  m_inputLayout->setStretch(0, 1); // Make message input expand
+  m_inputLayout->setStretch(1, 0); // Keep send button fixed size
+  m_inputLayout->setStretch(2, 0); // Keep update schematics button fixed size
+  m_inputLayout->setContentsMargins(0, 0, 0, 0); // Remove margins
 
-  // Setup Node.js connection button (at bottom)
-  m_actionButton->setStyleSheet("QPushButton { padding: 8px 16px; background-color: #28a745; color: white; border: none; border-radius: 4px; margin-top: 10px; } QPushButton:hover { background-color: #218838; }");
+  // Setup Node.js connection button (at bottom) - match Fritzing button style
+  m_actionButton->setStyleSheet("QPushButton { padding: 8px 16px; background: #ececec; color: #323232; border: 1px solid #b1b1b1; border-radius: 0px; font-family: 'Droid Sans'; font-size: 11px; margin-top: 10px; } QPushButton:hover { background: #666666; color: #ffffff; } QPushButton:pressed { background: #f23926; color: #d9d9d9; }");
 
   // Connect signals
   connect(m_actionButton, SIGNAL(clicked()), this, SLOT(handleButtonClick()));
   connect(m_sendButton, SIGNAL(clicked()), this, SLOT(handleSendMessage()));
+  connect(m_updateSchematicsButton, SIGNAL(clicked()), this, SLOT(handleUpdateSchematics()));
   connect(m_messageInput, SIGNAL(returnPressed()), this, SLOT(handleSendMessage()));
 
   // Connect Node.js process signals
@@ -61,29 +101,45 @@ BlinkBoardWidget::BlinkBoardWidget(QWidget *parent)
   connect(m_nodeProcess, SIGNAL(finished(int,QProcess::ExitStatus)), 
           this, SLOT(handleNodeFinished(int,QProcess::ExitStatus)));
 
-  // Build the layout
-  auto groupLayout = new QVBoxLayout();
-  groupLayout->setObjectName("BlinkBoardBoxes");
+  // Build the layout directly in main layout (no group box)
+  m_mainLayout->setContentsMargins(10, 10, 10, 10);
+  m_mainLayout->setSpacing(10); // Add spacing between elements
   
   // Add chat interface at the top
-  groupLayout->addWidget(m_chatDisplay);
-  groupLayout->addLayout(m_inputLayout);
+  m_mainLayout->addWidget(m_chatDisplay);
+  m_mainLayout->addLayout(m_inputLayout);
   
-  // Add separator
+  // Add separator - match Fritzing separator style
   auto separator = new QFrame();
   separator->setFrameShape(QFrame::HLine);
   separator->setFrameShadow(QFrame::Sunken);
-  groupLayout->addWidget(separator);
+  separator->setStyleSheet("QFrame { background-color: #b1b1b1; border: none; }");
+  m_mainLayout->addWidget(separator);
   
   // Add Node.js connection button at the bottom
-  groupLayout->addWidget(m_actionButton);
+  m_mainLayout->addWidget(m_actionButton);
+  
+  // Set stretch factors to make chat area expand
+  m_mainLayout->setStretch(0, 1); // Chat display gets most space
+  m_mainLayout->setStretch(1, 0); // Input area fixed height
+  m_mainLayout->setStretch(2, 0); // Separator fixed height
+  m_mainLayout->setStretch(3, 0); // Button fixed height
 
-  m_groupBox->setLayout(groupLayout);
-  m_mainLayout->addWidget(m_groupBox);
   frame->setLayout(m_mainLayout);
+  frame->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+  
+  // Style the main frame to match Fritzing background
+  frame->setStyleSheet("QFrame { background-color: #d9d9d9; border: none; }");
 
   this->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
   this->setWidget(frame);
+  this->setWidgetResizable(true);
+  this->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+  this->setFrameShape(QFrame::NoFrame);
+  
+  // Ensure the widget expands to fill available space
+  this->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+  this->setMinimumWidth(500); // Set minimum width for the entire widget
 
   // Add welcome message
   addChatMessage("Welcome to BlinkBoard Chat! Connect to the Node.js backend to start chatting.", false);
@@ -288,11 +344,11 @@ void BlinkBoardWidget::addChatMessage(const QString &message, bool isUser) {
   QString formattedMessage;
   
   if (isUser) {
-    formattedMessage = QString("<div style='text-align: right; margin: 5px;'><span style='background-color: #007bff; color: white; padding: 5px 10px; border-radius: 10px; display: inline-block;'>%1</span><br><small style='color: #6c757d;'>%2</small></div>")
+    formattedMessage = QString("<div style='text-align: right; margin: 5px;'><span style='background-color: #821f09; color: white; padding: 5px 10px; border-radius: 0px; display: inline-block; font-family: Droid Sans; font-size: 11px;'>%1</span><br><small style='color: #777777; font-family: Droid Sans; font-size: 9px;'>%2</small></div>")
                       .arg(message.toHtmlEscaped())
                       .arg(timestamp);
   } else {
-    formattedMessage = QString("<div style='margin: 5px;'><span style='background-color: #e9ecef; color: #495057; padding: 5px 10px; border-radius: 10px; display: inline-block;'>%1</span><br><small style='color: #6c757d;'>%2</small></div>")
+    formattedMessage = QString("<div style='margin: 5px;'><span style='background-color: #ececec; color: #323232; padding: 5px 10px; border-radius: 0px; display: inline-block; border: 1px solid #b1b1b1; font-family: Droid Sans; font-size: 11px;'>%1</span><br><small style='color: #777777; font-family: Droid Sans; font-size: 9px;'>%2</small></div>")
                       .arg(message.toHtmlEscaped())
                       .arg(timestamp);
   }
@@ -303,4 +359,186 @@ void BlinkBoardWidget::addChatMessage(const QString &message, bool isUser) {
   QTextCursor cursor = m_chatDisplay->textCursor();
   cursor.movePosition(QTextCursor::End);
   m_chatDisplay->setTextCursor(cursor);
+}
+
+void BlinkBoardWidget::handleUpdateSchematics() {
+  if (m_nodeProcess->state() != QProcess::Running) {
+    addChatMessage("Not connected to backend. Please connect first.", false);
+    return;
+  }
+
+  // Get the current netlist XML
+  QString netlistXml = currentNetlistXml();
+  if (netlistXml.isEmpty()) {
+    addChatMessage("Could not generate netlist. No sketch available.", false);
+    return;
+  }
+
+  // Add user message to chat
+  addChatMessage("Updating schematics with current netlist...", true);
+
+  // Send the netlist XML to the Node.js backend
+  QJsonObject jsonCommand;
+  jsonCommand["command"] = "update_schematics";
+  jsonCommand["netlist"] = netlistXml;
+  jsonCommand["timestamp"] = QDateTime::currentMSecsSinceEpoch();
+  
+  QJsonDocument doc(jsonCommand);
+  QString jsonString = doc.toJson(QJsonDocument::Compact);
+  
+  qDebug() << "Sending netlist to Node.js:" << jsonString.left(200) + "...";
+  m_nodeProcess->write(jsonString.toUtf8() + "\n");
+}
+
+// Helper function to find the main window from a widget
+static MainWindow *findMainWindow(const QWidget *w) {
+  const QWidget *p = w;
+  while (p) {
+    if (auto mw = qobject_cast<MainWindow*>(p->window())) return mw;
+    p = p->parentWidget();
+  }
+  return nullptr;
+}
+
+// Helper function to get the current sketch widget
+static SketchWidget *currentSketchFrom(const QWidget *w) {
+  if (auto mw = findMainWindow(w)) {
+    auto list = mw->sketchWidgets();
+    
+    // For now, just return the first available sketch widget
+    // This will typically be the breadboard view
+    if (!list.isEmpty()) {
+      return list[0];
+    }
+  }
+  return nullptr;
+}
+
+// Helper function to get the breadboard sketch widget
+static BreadboardSketchWidget *breadboardViewFrom(const QWidget *w) {
+  if (auto mw = findMainWindow(w)) {
+    auto list = mw->sketchWidgets();
+    if (!list.isEmpty())
+      return qobject_cast<BreadboardSketchWidget*>(list[0]);
+  }
+  return nullptr;
+}
+
+QString BlinkBoardWidget::currentNetlistXml() const {
+  SketchWidget *sk = currentSketchFrom(this);
+  if (!sk) return QString();
+
+  QHash<ConnectorItem*, int> indexer;
+  QList<QList<ConnectorItem*>*> nets;
+  sk->collectAllNets(indexer, nets, true, sk->boardLayers() > 1);
+
+  // Filter ignored connectors (ERC rules), mirroring exportNetlist()
+  QList<QList<ConnectorItem*>*> toDelete;
+  for (auto net : nets) {
+    QList<ConnectorItem*> remove;
+    for (auto ci : *net) {
+      if (auto erc = ci->connectorSharedErcData()) {
+        if (erc->ignore() == ErcData::Always) remove.append(ci);
+        else if (erc->ignore() == ErcData::IfUnconnected && net->count() == 1) remove.append(ci);
+      }
+    }
+    for (auto ci : remove) net->removeOne(ci);
+    if (net->isEmpty()) toDelete.append(net);
+  }
+  for (auto net : toDelete) nets.removeOne(net);
+
+  QDomDocument doc;
+  doc.setContent(QString("<?xml version='1.0' encoding='UTF-8'?>\n"));
+  QDomElement netlist = doc.createElement("netlist");
+  netlist.setAttribute("date", QDateTime::currentDateTime().toString());
+  doc.appendChild(netlist);
+
+  for (auto net : nets) {
+    QDomElement netEl = doc.createElement("net");
+    netlist.appendChild(netEl);
+    for (auto ci : *net) {
+      QDomElement connEl = doc.createElement("connector");
+      connEl.setAttribute("id", ci->connectorSharedID());
+      connEl.setAttribute("name", ci->connectorSharedName());
+
+      QDomElement partEl = doc.createElement("part");
+      auto item = ci->attachedTo();
+      partEl.setAttribute("id", item->id());
+      partEl.setAttribute("label", item->instanceTitle());
+      partEl.setAttribute("title", item->title());
+      connEl.appendChild(partEl);
+
+      if (auto erc = ci->connectorSharedErcData()) {
+        QDomElement ercEl = doc.createElement("erc");
+        if (erc->writeToElement(ercEl, doc)) connEl.appendChild(ercEl);
+      }
+
+      netEl.appendChild(connEl);
+    }
+  }
+
+  for (auto net : nets) delete net;
+  nets.clear();
+
+  return doc.toString(-1);
+}
+
+QString BlinkBoardWidget::breadboardNetlistXml() const {
+  if (auto bb = breadboardViewFrom(this)) {
+    // Build the XML using the breadboard view specifically
+    QHash<ConnectorItem*, int> indexer;
+    QList<QList<ConnectorItem*>*> nets;
+    bb->collectAllNets(indexer, nets, true, bb->boardLayers() > 1);
+
+    QList<QList<ConnectorItem*>*> toDelete;
+    for (auto net : nets) {
+      QList<ConnectorItem*> remove;
+      for (auto ci : *net) {
+        if (auto erc = ci->connectorSharedErcData()) {
+          if (erc->ignore() == ErcData::Always) remove.append(ci);
+          else if (erc->ignore() == ErcData::IfUnconnected && net->count() == 1) remove.append(ci);
+        }
+      }
+      for (auto ci : remove) net->removeOne(ci);
+      if (net->isEmpty()) toDelete.append(net);
+    }
+    for (auto net : toDelete) nets.removeOne(net);
+
+    QDomDocument doc;
+    doc.setContent(QString("<?xml version='1.0' encoding='UTF-8'?>\n"));
+    QDomElement netlist = doc.createElement("netlist");
+    netlist.setAttribute("view", "breadboard");
+    netlist.setAttribute("date", QDateTime::currentDateTime().toString());
+    doc.appendChild(netlist);
+
+    for (auto net : nets) {
+      QDomElement netEl = doc.createElement("net");
+      netlist.appendChild(netEl);
+      for (auto ci : *net) {
+        QDomElement connEl = doc.createElement("connector");
+        connEl.setAttribute("id", ci->connectorSharedID());
+        connEl.setAttribute("name", ci->connectorSharedName());
+
+        QDomElement partEl = doc.createElement("part");
+        auto item = ci->attachedTo();
+        partEl.setAttribute("id", item->id());
+        partEl.setAttribute("label", item->instanceTitle());
+        partEl.setAttribute("title", item->title());
+        connEl.appendChild(partEl);
+
+        if (auto erc = ci->connectorSharedErcData()) {
+          QDomElement ercEl = doc.createElement("erc");
+          if (erc->writeToElement(ercEl, doc)) connEl.appendChild(ercEl);
+        }
+
+        netEl.appendChild(connEl);
+      }
+    }
+
+    for (auto net : nets) delete net;
+    nets.clear();
+
+    return doc.toString(-1);
+  }
+  return QString();
 }

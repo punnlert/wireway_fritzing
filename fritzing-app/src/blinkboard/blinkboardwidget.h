@@ -1,7 +1,6 @@
 #ifndef BLINKBOARDWIDGET_H
 #define BLINKBOARDWIDGET_H
 
-#include <QGroupBox>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QVBoxLayout>
@@ -23,6 +22,10 @@ public:
 
   void updateContent();
   void resetLayout();
+  
+  // Helper methods for accessing sketch data
+  QString currentNetlistXml() const;
+  QString breadboardNetlistXml() const;
 
 protected slots:
   void handleButtonClick();
@@ -33,17 +36,18 @@ protected slots:
   void handleNodeFinished(int exitCode, QProcess::ExitStatus exitStatus);
   void handleSendMessage();
   void handleMessageReceived(const QString &message);
+  void handleUpdateSchematics();
 
 protected:
   QPushButton *m_actionButton;
   QVBoxLayout *m_mainLayout;
-  QGroupBox *m_groupBox;
   QProcess *m_nodeProcess;
   
   // Chat interface elements
   QTextEdit *m_chatDisplay;
   QLineEdit *m_messageInput;
   QPushButton *m_sendButton;
+  QPushButton *m_updateSchematicsButton;
   QHBoxLayout *m_inputLayout;
   
   void startNodeBackend();
