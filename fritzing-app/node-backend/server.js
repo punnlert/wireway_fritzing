@@ -5,6 +5,9 @@ const fs = require("fs");
 const path = require("path");
 require("dotenv").config({ path: path.join(__dirname, ".env") });
 const { OpenAI } = require("openai");
+const { parseString } = require("xml2js");
+const yaml = require("yaml");
+const { spawn } = require("child_process");
 
 const SYSTEM_INSTRUCTION = `You are a teacher assistant in an online interaction prototyping class. The class utilize a tool called "BlinkBoard"; a breadboard with built-in LEDs in each row that can light up to signify to the user which row of the board the instructor is referring to. Each connection hole in the BlinkBoard has a specific coordinate in the form of [row, column]. the coordinate maps to the following schema on the Blinkboard;
 Blinkboard Schematics
@@ -32,6 +35,7 @@ const openai = new OpenAI({
 
 let openai_chat_history = [];
 let schematics;
+let schematic_file_change = false;
 
 let create_param = {
   // model: 'o4-mini',
@@ -41,20 +45,89 @@ let create_param = {
   // tools,
 };
 
-function update_schematics(netlist) {
-  schematics = netlist;
+async function update_schematics(netlist) {
+  return new Promise((resolve, reject) => {
+    const rustBinaryPath = path.join(
+      __dirname,
+      "../parse-schematics/target/release/parse-schematics"
+    );
+
+    console.log("Using Rust binary:", rustBinaryPath);
+
+    // Add Fritzing namespace if it's missing
+    let processedXml = netlist;
+    if (!netlist.includes("xmlns=")) {
+      // Find the root element and add xmlns attribute
+      const rootMatch = netlist.match(/<(\w+)/);
+      if (rootMatch) {
+        const rootTag = rootMatch[1];
+        const xmlnsAttr = `xmlns="http://fritzing.org/fritzing-0.9.3"`;
+        processedXml = netlist.replace(
+          `<${rootTag}`,
+          `<${rootTag} ${xmlnsAttr}`
+        );
+        console.log("Added Fritzing namespace to XML");
+      }
+    }
+
+    const rustProcess = spawn(rustBinaryPath, [processedXml]);
+
+    let yamlOutput = "";
+    let errorOutput = "";
+
+    rustProcess.stdout.on("data", (data) => {
+      yamlOutput += data.toString();
+    });
+
+    rustProcess.stderr.on("data", (data) => {
+      errorOutput += data.toString();
+    });
+
+    rustProcess.on("close", (code) => {
+      console.log(`Rust process exited with code ${code}`);
+      if (code === 0) {
+        try {
+          // Parse the YAML output
+          console.log(yamlOutput);
+          const schematics = yamlOutput;
+          schematic_file_change = true;
+          resolve(schematics);
+        } catch (parseError) {
+          console.error("Error parsing YAML output:", parseError);
+          reject(new Error(`Failed to parse YAML: ${parseError.message}`));
+        }
+      } else {
+        reject(new Error(`Rust process failed: ${errorOutput}`));
+      }
+    });
+
+    rustProcess.on("error", (error) => {
+      console.error("❌ Failed to start Rust process:", error);
+      reject(error);
+    });
+  });
 }
 
 async function send_openai_message(message) {
-  // if (openai_chat_history.length == 0) {
-  //   openai_chat_history.push({
-  //     role: "developer",
-  //     content: SYSTEM_INSTRUCTION,
-  //   });
-  // }
+  if (openai_chat_history.length == 0) {
+    openai_chat_history.push({
+      role: "developer",
+      content: SYSTEM_INSTRUCTION,
+    });
+  }
 
-  // let query_text = `${prompt} \n Add any test if necessary. You can explain the test in your reply but you don't have to mention some trivial details like test_key`;
-  let query_text = message;
+  if (schematic_file_change) {
+    const update_schematics = `this is the .yaml representation of the schematics \n ${schematics} \n `;
+
+    openai_chat_history.push({
+      role: "developer",
+      content: update_schematics,
+    });
+
+    schematic_file_change = false;
+  }
+
+  let query_text = `${message} \n Add any test if necessary. You can explain the test in your reply but you don't have to mention some trivial details like test_key`;
 
   openai_chat_history.push({
     role: "user",
@@ -138,12 +211,20 @@ async function processCommand(command) {
       };
 
     case "update_schematics":
-      update_schematics(command.netlist);
-      return {
-        status: "success",
-        message: command.netlist,
-        timestamp: Date.now(),
-      };
+      try {
+        schematics = await update_schematics(command.netlist);
+        return {
+          status: "success",
+          message: JSON.stringify(schematics),
+          timestamp: Date.now(),
+        };
+      } catch (error) {
+        return {
+          status: "error",
+          error: error.message,
+          timestamp: Date.now(),
+        };
+      }
 
     default:
       // Check if it's a chat message
