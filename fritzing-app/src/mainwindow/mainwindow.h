@@ -53,6 +53,8 @@ class QListWidget;
 class QMenu;
 QT_END_NAMESPACE
 
+class TestWidget;
+
 class FSizeGrip;
 
 typedef class FDockWidget *(*DockFactory)(const QString &title,
@@ -726,6 +728,9 @@ protected:
 
   // blinkboard
   QPointer<class BlinkBoardWidget> m_blinkboardWidget;
+
+  // test widget
+  QPointer<class TestWidget> m_testWidget;
 
   bool m_closing = false;
   bool m_dontClose = false;

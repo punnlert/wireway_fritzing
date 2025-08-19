@@ -36,6 +36,7 @@ const openai = new OpenAI({
 let openai_chat_history = [];
 let schematics;
 let schematic_file_change = false;
+let testGroups = []; // Store test groups for the test window
 
 let create_param = {
   // model: 'o4-mini',
@@ -226,6 +227,59 @@ async function processCommand(command) {
         };
       }
 
+    case "get_test_groups":
+      // Return all stored test groups for display in Qt frontend
+      return {
+        status: "success",
+        message: "Test groups retrieved successfully",
+        testGroups: testGroups,
+        timestamp: Date.now(),
+      };
+
+    case "add_test_group":
+      // Add a new test group to the collection
+      const { testGroupData } = command;
+      if (testGroupData) {
+        const newTestGroup = {
+          id: Date.now().toString(), // Simple ID generation as string
+          ...testGroupData,
+          timestamp: Date.now(),
+        };
+        testGroups.push(newTestGroup);
+        return {
+          status: "success",
+          message: "Test group added successfully",
+          testGroup: newTestGroup,
+          timestamp: Date.now(),
+        };
+      } else {
+        return {
+          status: "error",
+          error: "No test group data provided",
+          timestamp: Date.now(),
+        };
+      }
+
+    case "submit_test_results":
+      // Handle test results submission
+      const { groupId, results } = command;
+      if (groupId && results) {
+        console.log(`Test results submitted for group ${groupId}:`, results);
+        return {
+          status: "success",
+          message: "Test results submitted successfully",
+          groupId: groupId,
+          results: results,
+          timestamp: Date.now(),
+        };
+      } else {
+        return {
+          status: "error",
+          error: "Missing group ID or results data",
+          timestamp: Date.now(),
+        };
+      }
+
     default:
       // Check if it's a chat message
       if (cmd.startsWith("chat:")) {
@@ -270,3 +324,68 @@ process.on("unhandledRejection", (reason, promise) => {
   console.error("Unhandled Rejection at:", promise, "reason:", reason);
   process.exit(1);
 });
+
+// Initialize with some sample test groups
+testGroups = [
+  {
+    id: "1",
+    title: "Circuit Validation Tests",
+    description:
+      "Basic validation tests for circuit components and connections",
+    tests: [
+      {
+        name: "Component Connection Test",
+        description: "Verify all components are properly connected",
+      },
+      {
+        name: "Power Supply Test",
+        description: "Check power supply connections and voltage levels",
+      },
+      {
+        name: "Signal Flow Test",
+        description: "Validate signal paths through the circuit",
+      },
+    ],
+    timestamp: Date.now(),
+  },
+  {
+    id: "2",
+    title: "Performance Tests",
+    description: "Performance and stress testing for circuit operation",
+    tests: [
+      {
+        name: "Load Testing",
+        description: "Test circuit behavior under various load conditions",
+      },
+      {
+        name: "Temperature Test",
+        description: "Verify circuit stability across temperature ranges",
+      },
+      {
+        name: "Frequency Response",
+        description: "Measure frequency response characteristics",
+      },
+    ],
+    timestamp: Date.now(),
+  },
+  {
+    id: "3",
+    title: "User Interface Tests",
+    description: "Testing the user interface and interaction elements",
+    tests: [
+      {
+        name: "Button Functionality",
+        description: "Test all button interactions and responses",
+      },
+      {
+        name: "Display Accuracy",
+        description: "Verify display shows correct information",
+      },
+      {
+        name: "Error Handling",
+        description: "Test system response to invalid inputs",
+      },
+    ],
+    timestamp: Date.now(),
+  },
+];

@@ -31,6 +31,7 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include "../utils/fileprogressdialog.h"
 #include "../utils/fsizegrip.h"
 #include "../utils/misc.h"
+#include "../tests/testwidget.h"
 #include "mainwindow.h"
 
 /////////////////////////////////////
@@ -66,7 +67,7 @@ void MainWindow::createDockWindows() {
       ->hide();
 
   makeDock(tr("Inspector"), m_infoView, InfoViewMinHeight,
-           InfoViewHeightDefault);
+           InfoViewHeightDefault)->hide();
 
   makeDock(tr("Undo History"), m_undoView, UndoHistoryMinHeight,
            UndoHistoryDefaultHeight)
@@ -77,6 +78,10 @@ void MainWindow::createDockWindows() {
   m_layerPalette->setMinimumSize(DockMinWidth, DockMinHeight);
   m_layerPalette->setShowAllLayersAction(m_showAllLayersAct);
   m_layerPalette->setHideAllLayersAction(m_hideAllLayersAct);
+
+  // Add Test Widget dock
+  makeDock(tr("Test Manager"), m_testWidget, DockMinWidth, DockMinHeight)->hide();
+  m_testWidget->setMinimumSize(DockMinWidth, DockMinHeight);
 
   if (m_programView == NULL) {
     m_windowMenu->addSeparator();
@@ -232,6 +237,9 @@ void MainWindow::initDock() {
   m_binManager->initStandardBins();
 
   m_blinkboardWidget = new BlinkBoardWidget(this);
+
+  // Initialize Test Widget
+  m_testWidget = new TestWidget(this);
 
   // DebugDialog::debug("after creating bins");
   if (m_fileProgressDialog) {
