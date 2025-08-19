@@ -64,5 +64,7 @@ Thumbs.db
 .bash_history
 saved_state
 
+.env
+
 */node_modules
 
