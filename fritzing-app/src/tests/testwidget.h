@@ -24,21 +24,28 @@ public slots:
     void updateTestGroups(const QJsonArray &testGroups);
     void addTestGroup(const QJsonObject &testGroup);
     void clearTestGroups();
+    void requestTestsFromBackend();
 
 private slots:
     void onConnectBlinkBoardClicked();
     void onSubmitTestResults(const QString &groupId);
+    void onConnectBackendClicked();
+    void onRefreshTestsClicked();
 
 signals:
     void testResultsSubmitted(const QString &groupId, const QJsonObject &results);
     void testGroupsRequested();
     void blinkBoardConnectionRequested();
+    void testsRequested();
 
 private:
     void setupUI();
     void setupConnections();
     void createTestGroupCard(const QJsonObject &testGroup);
     void clearCards();
+    
+    // Backend handling
+    void handleTestsReceived(const QJsonArray &tests);
 
     // UI Components
     QVBoxLayout *m_mainLayout;
@@ -46,6 +53,10 @@ private:
     
     // Data
     QJsonArray m_testGroups;
+    
+    // Backend connection
+    QPushButton *m_connectButton;
+    QPushButton *m_refreshTestsButton;
 };
 
 #endif // TESTWIDGET_HPP

@@ -59,8 +59,8 @@ function createErrorResponse(error, lineNumber) {
 }
 
 let create_param = {
-  // model: 'o4-mini',
-  model: "gpt-4o-mini",
+  model: "o4-mini",
+  // model: "gpt-4o-mini",
   input: openai_chat_history,
   // stream: true,
   // tools,
@@ -197,12 +197,15 @@ function init_blinkboard_sequence() {
   write_json_to_port({
     cmd: "reset",
   });
-  write_json_to_port({ cmd: "setLed", led: "1", pattern: "blink2" });
+  write_json_to_port({
+    cmd: "animate",
+  });
+  // write_json_to_port({ cmd: "setLed", led: "1", pattern: "blink2" });
 }
 
 function write_json_to_port(json) {
   if (!blinkboard_serial_port) return;
-  const to_write = `${JSON.stringify(json)}\n\r`;
+  const to_write = `${JSON.stringify(json)}\n`;
   console.log("Writing to serial port:", to_write);
   blinkboard_serial_port.write(to_write, (error) => {
     if (error) {
@@ -241,7 +244,7 @@ async function send_openai_message(message) {
   });
 
   const response = await openai.responses.create(create_param);
-  return response.output[0].content[0].text;
+  return JSON.stringify(response);
 }
 
 // Function to detect available serial ports

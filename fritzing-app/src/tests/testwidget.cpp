@@ -6,6 +6,8 @@ TestWidget::TestWidget(QWidget *parent)
     : QWidget(parent)
     , m_mainLayout(nullptr)
     , m_cardLayout(nullptr)
+    , m_connectButton(new QPushButton(tr("Request Tests")))
+    , m_refreshTestsButton(new QPushButton(tr("Refresh Tests")))
 {
     setupUI();
     setupConnections();
@@ -23,6 +25,25 @@ void TestWidget::setupUI()
     m_mainLayout->setContentsMargins(10, 10, 10, 10);
     m_mainLayout->setSpacing(15);
     
+    // Add test management buttons at the top
+    QHBoxLayout *buttonLayout = new QHBoxLayout();
+    buttonLayout->addWidget(m_connectButton);
+    buttonLayout->addWidget(m_refreshTestsButton);
+    buttonLayout->addStretch();
+    
+    // Style the buttons
+    m_connectButton->setStyleSheet("QPushButton { padding: 8px 16px; background: #ececec; color: #323232; border: 1px solid #b1b1b1; border-radius: 0px; font-family: 'Droid Sans'; font-size: 11px; } QPushButton:hover { background: #666666; color: #ffffff; } QPushButton:pressed { background: #f23926; color: #d9d9d9; }");
+    m_refreshTestsButton->setStyleSheet("QPushButton { padding: 8px 16px; background: #ececec; color: #323232; border: 1px solid #b1b1b1; border-radius: 0px; font-family: 'Droid Sans'; font-size: 11px; } QPushButton:hover { background: #666666; color: #ffffff; } QPushButton:pressed { background: #f23926; color: #d9d9d9; }");
+    
+    m_mainLayout->addLayout(buttonLayout);
+    
+    // Add separator
+    QFrame *separator = new QFrame();
+    separator->setFrameShape(QFrame::HLine);
+    separator->setFrameShadow(QFrame::Sunken);
+    separator->setStyleSheet("QFrame { background-color:#d9d9d9; border: none; }");
+    m_mainLayout->addWidget(separator);
+    
     // Create scroll area for test group cards
     QScrollArea *scrollArea = new QScrollArea(this);
     scrollArea->setWidgetResizable(true);
@@ -36,12 +57,6 @@ void TestWidget::setupUI()
     m_cardLayout->setContentsMargins(5, 5, 5, 5);
     m_cardLayout->setSpacing(15);
     
-    // Add BlinkBoard connection button at the top
-    QPushButton *blinkBoardButton = new QPushButton("Connect to BlinkBoard", this);
-    blinkBoardButton->setStyleSheet("QPushButton { padding: 8px 16px; background: #ececec; color: #323232; border: 1px solid #b1b1b1; border-radius: 0px; font-family: 'Droid Sans'; font-size: 11px; margin-bottom: 10px; } QPushButton:hover { background: #666666; color: #ffffff; } QPushButton:pressed { background: #f23926; color: #d9d9d9; }");
-    connect(blinkBoardButton, &QPushButton::clicked, this, &TestWidget::onConnectBlinkBoardClicked);
-    
-    m_mainLayout->addWidget(blinkBoardButton);
     m_mainLayout->addWidget(scrollArea);
     
     scrollArea->setWidget(cardContainer);
@@ -60,7 +75,9 @@ void TestWidget::setupUI()
 
 void TestWidget::setupConnections()
 {
-    // Connections are now handled in setupUI for the refresh button
+    // Connect test management buttons
+    connect(m_connectButton, &QPushButton::clicked, this, &TestWidget::onConnectBackendClicked);
+    connect(m_refreshTestsButton, &QPushButton::clicked, this, &TestWidget::onRefreshTestsClicked);
 }
 
 void TestWidget::updateTestGroups(const QJsonArray &testGroups)
@@ -142,9 +159,6 @@ void TestWidget::createTestGroupCard(const QJsonObject &testGroup)
     // Tests to be performed (middle section)
     QJsonArray tests = testGroup["tests"].toArray();
     if (!tests.isEmpty()) {
-        QLabel *testsLabel = new QLabel("Tests to perform:", card);
-        testsLabel->setStyleSheet("QLabel { font-family: 'Droid Sans'; font-size: 11px; font-weight: bold; color: #323232; margin-top: 10px; }");
-        
         for (const QJsonValue &testValue : tests) {
             QJsonObject test = testValue.toObject();
             QString testName = test["name"].toString();
@@ -196,4 +210,31 @@ void TestWidget::createTestGroupCard(const QJsonObject &testGroup)
     
     // Add card to main layout
     m_cardLayout->addWidget(card);
+}
+
+void TestWidget::handleTestsReceived(const QJsonArray &tests)
+{
+    qDebug() << "🧪 Received" << tests.size() << "test groups from backend";
+    updateTestGroups(tests);
+}
+
+void TestWidget::onConnectBackendClicked()
+{
+    // This will request tests from the shared backend
+    // The backend should already be running from BlinkBoardWidget
+    emit testsRequested();
+}
+
+void TestWidget::onRefreshTestsClicked()
+{
+    // This will request tests from the shared backend
+    // The backend should already be running from BlinkBoardWidget
+    emit testsRequested();
+}
+
+void TestWidget::requestTestsFromBackend()
+{
+    // This method can be called from BlinkBoardWidget to request tests
+    // It will emit the signal that BlinkBoardWidget can listen to
+    emit testsRequested();
 }

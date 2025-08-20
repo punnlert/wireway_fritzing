@@ -245,6 +245,14 @@ void MainWindow::initDock() {
   connect(m_testWidget, &TestWidget::blinkBoardConnectionRequested, 
           m_blinkboardWidget, &BlinkBoardWidget::handleBlinkBoardConnectionRequest);
 
+  // Connect TestWidget's test request signal to BlinkBoardWidget's test request method
+  connect(m_testWidget, &TestWidget::testsRequested, 
+          m_blinkboardWidget, &BlinkBoardWidget::requestTestsFromBackend);
+
+  // Connect BlinkBoardWidget's test response signal to TestWidget's test update method
+  connect(m_blinkboardWidget, &BlinkBoardWidget::testsReceived, 
+          m_testWidget, &TestWidget::updateTestGroups);
+
   // DebugDialog::debug("after creating bins");
   if (m_fileProgressDialog) {
     m_fileProgressDialog->setValue(89);

@@ -34,7 +34,7 @@ class ErcData;
 #include "../viewlayer.h"
 
 BlinkBoardWidget::BlinkBoardWidget(QWidget *parent)
-    : QScrollArea(parent), m_actionButton(new QPushButton(tr("Restart Node.js Backend"))),
+    : QScrollArea(parent), m_actionButton(new QPushButton(tr("Connect to BlinkBoard"))),
       m_mainLayout(new QVBoxLayout()),
       m_nodeProcess(new QProcess(this)),
       m_chatDisplay(new QTextEdit()),
@@ -301,6 +301,12 @@ void BlinkBoardWidget::handleNodeProcessOutput() {
         QJsonArray ports = response["serialPorts"].toArray();
         handleSerialPortsReceived(ports);
       }
+      
+      // Check if this contains test groups
+      if (response.contains("testGroups")) {
+        QJsonArray tests = response["testGroups"].toArray();
+        handleTestsReceived(tests);
+      }
     } else {
       // Check if it's a raw chat message (non-JSON)
       if (line.startsWith("chat:")) {
@@ -325,6 +331,13 @@ void BlinkBoardWidget::handleNodeStarted() {
   
   // Update button to green (connected)
   updateButtonColor(true);
+  
+  // Automatically request tests from the backend when it starts
+  QTimer::singleShot(1000, this, [this]() {
+    if (m_nodeProcess->state() == QProcess::Running) {
+      requestTestsFromBackend();
+    }
+  });
 }
 
 void BlinkBoardWidget::handleNodeError(QProcess::ProcessError error) {
@@ -581,9 +594,13 @@ void BlinkBoardWidget::updateButtonColor(bool isConnected) {
   if (isConnected) {
     // Green circle when connected
     m_statusIndicator->setStyleSheet("QLabel { background-color: #4CAF50; border-radius: 4px; }");
+    // Update button text to "Restart Backend" when connected
+    m_actionButton->setText(tr("Restart Backend"));
   } else {
     // Red circle when not connected
     m_statusIndicator->setStyleSheet("QLabel { background-color: #f44336; border-radius: 4px; }");
+    // Update button text to "Connect to BlinkBoard" when not connected
+    m_actionButton->setText(tr("Connect to BlinkBoard"));
   }
 }
 
@@ -684,5 +701,22 @@ void BlinkBoardWidget::handleBlinkBoardConnectionRequest() {
     }
   } else {
     addChatMessage("Cannot connect to BlinkBoard - Node.js backend not running", false);
+  }
+}
+
+void BlinkBoardWidget::handleTestsReceived(const QJsonArray &tests) {
+  qDebug() << "🧪 Received" << tests.size() << "test groups from backend";
+  
+  // Emit a signal that TestWidget can listen to
+  // This will be connected in the main application
+  emit testsReceived(tests);
+}
+
+void BlinkBoardWidget::requestTestsFromBackend() {
+  if (m_nodeProcess->state() == QProcess::Running) {
+    qDebug() << "Requesting tests from backend...";
+    sendCommandToNode("get_test_groups");
+  } else {
+    qDebug() << "Cannot request tests - Node.js backend not running";
   }
 }

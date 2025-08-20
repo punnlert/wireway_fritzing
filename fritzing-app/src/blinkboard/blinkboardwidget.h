@@ -33,6 +33,10 @@ public:
 
 public slots:
   void handleBlinkBoardConnectionRequest();
+  void requestTestsFromBackend();
+
+signals:
+  void testsReceived(const QJsonArray &tests);
 
 protected slots:
   void handleButtonClick();
@@ -72,5 +76,8 @@ protected:
   void handleSerialPortsReceived(const QJsonArray &ports);
   void showPortSelectionDialog();
   void connectToSelectedPort(const QString &portPath);
+  
+  // Test handling
+  void handleTestsReceived(const QJsonArray &tests);
 };
 #endif
