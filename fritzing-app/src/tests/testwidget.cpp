@@ -7,8 +7,6 @@ TestWidget::TestWidget(QWidget *parent)
     : QWidget(parent)
     , m_mainLayout(nullptr)
     , m_cardLayout(nullptr)
-    , m_connectButton(new QPushButton(tr("Request Tests")))
-    , m_refreshTestsButton(new QPushButton(tr("Refresh Tests")))
 {
     setupUI();
     setupConnections();
@@ -33,8 +31,6 @@ void TestWidget::setupUI()
     buttonLayout->addStretch();
     
     // Style the buttons
-    m_connectButton->setStyleSheet("QPushButton { padding: 8px 16px; background: #ececec; color: #323232; border: 1px solid #b1b1b1; border-radius: 0px; font-family: 'Droid Sans'; font-size: 11px; } QPushButton:hover { background: #666666; color: #ffffff; } QPushButton:pressed { background: #f23926; color: #d9d9d9; }");
-    m_refreshTestsButton->setStyleSheet("QPushButton { padding: 8px 16px; background: #ececec; color: #323232; border: 1px solid #b1b1b1; border-radius: 0px; font-family: 'Droid Sans'; font-size: 11px; } QPushButton:hover { background: #666666; color: #ffffff; } QPushButton:pressed { background: #f23926; color: #d9d9d9; }");
     
     m_mainLayout->addLayout(buttonLayout);
     
@@ -136,8 +132,8 @@ void TestWidget::createTestGroupCard(const QJsonObject &testGroup)
 {
     // Create card container
     QFrame *card = new QFrame(this);
-    card->setFrameStyle(QFrame::Box);
-    card->setStyleSheet("QFrame { background-color: rgb(243, 243, 243); border: 1px solid #b1b1b1; border-radius: 0px; padding: 5px; margin: 5px; }");
+    card->setFrameStyle(QFrame::NoFrame);
+    card->setStyleSheet("QFrame { background-color: rgb(243, 243, 243); border: none; border-radius: 0px; padding: 5px; margin: 5px; }");
     
     QVBoxLayout *cardLayout = new QVBoxLayout(card);
     cardLayout->setContentsMargins(15, 15, 15, 15);

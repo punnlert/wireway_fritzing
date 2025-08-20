@@ -687,6 +687,7 @@ void BlinkBoardWidget::showPortSelectionDialog() {
   layout->addWidget(label);
   
   QComboBox *portCombo = new QComboBox(dialog);
+  portCombo->setStyleSheet("QComboBox { background-color: white; color: black; border: 1px solid #b1b1b1; padding: 5px; } QComboBox::drop-down { border: none; } QComboBox::down-arrow { image: none; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 5px solid black; } QComboBox QAbstractItemView { background-color: white; color: black; selection-background-color: #0078d4; selection-color: white; }");
   for (const QJsonValue &value : m_serialPorts) {
     QJsonObject port = value.toObject();
     portCombo->addItem(port["path"].toString());
