@@ -81,7 +81,10 @@ protected:
   // Simple streaming status handling
   void handleStreamingStart();
   void handleStreamingDone();
-  
+
+  // Function calling handling
+  void handleFunctionCalling();
+
   // Serial port handling
   void handleSerialPortsReceived(const QJsonArray &ports);
   void showPortSelectionDialog();

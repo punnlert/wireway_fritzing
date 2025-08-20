@@ -172,11 +172,27 @@ class EventHandler extends EventEmitter {
 
   async onEvent(event) {
     try {
-      // console.log(event);
+      console.log(event);
       // Retrieve events that are denoted with 'requires_action'
       // since these will have our tool_calls
       if (event.type === "response.output_item.added") {
-        const { item } = event;
+        if (event.item.type === "message") {
+          process.stdout.write(
+            JSON.stringify({
+              type: "streaming_start",
+              message: "Starting AI response...",
+              timestamp: Date.now(),
+            }) + "\n"
+          );
+        } else if (event.item.type === "function_call") {
+          process.stdout.write(
+            JSON.stringify({
+              type: "function_calling",
+              message: "Calling function...",
+              timestamp: Date.now(),
+            }) + "\n"
+          );
+        }
       } else if (event.type === "response.completed") {
         event.response.output.forEach((output) => {
           if (output.type === "message") {
@@ -203,14 +219,6 @@ class EventHandler extends EventEmitter {
           });
           this.handle_function_calls(function_calls);
         }
-      } else if (event.type === "response.in_progress") {
-        process.stdout.write(
-          JSON.stringify({
-            type: "streaming_start",
-            message: "Starting AI response...",
-            timestamp: Date.now(),
-          }) + "\n"
-        );
       } else if (event.type === "response.output_text.done") {
         // TODO: tell the frontend that the output is done
 
@@ -731,12 +739,12 @@ async function processCommand(command) {
         console.log(`Chat message received: ${message}`);
 
         const response = await send_openai_message(message);
-        // Echo the message back (you can add more sophisticated chat logic here)
-        return {
-          type: "chat",
-          message: `${response}`,
-          timestamp: Date.now(),
-        };
+        // // Echo the message back (you can add more sophisticated chat logic here)
+        // return {
+        //   type: "chat",
+        //   message: `${response}`,
+        //   timestamp: Date.now(),
+        // };
       }
 
       return createErrorResponse(new Error(`Unknown command: ${cmd}`), 435);

@@ -326,6 +326,10 @@ void BlinkBoardWidget::handleNodeProcessOutput() {
           qDebug() << "✅ Streaming completed from backend";
           handleStreamingDone();
           continue;
+        } else if (type == "function_calling") {
+          qDebug() << "🚀 Function calling from backend";
+          handleFunctionCalling();
+          continue;
         }
       }
       
@@ -771,6 +775,13 @@ void BlinkBoardWidget::requestTestsFromBackend() {
   } else {
     qDebug() << "Cannot request tests - Node.js backend not running";
   }
+}
+
+void BlinkBoardWidget::handleFunctionCalling() {
+  qDebug() << "🚀 Function calling from backend";
+  // TODO: Implement function calling
+
+   addChatMessage("adding tests...", false);
 }
 
 // Simple streaming status handling methods
