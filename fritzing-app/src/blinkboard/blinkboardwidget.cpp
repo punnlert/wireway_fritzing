@@ -837,3 +837,26 @@ void BlinkBoardWidget::submitTestResultsToBackend(const QString &groupId, const 
   
   addChatMessage("submitted tests results for group " + groupId, false);
 }
+
+void BlinkBoardWidget::handleBlinkRequest(const QJsonObject &test, const QString &action)
+{
+  if (m_nodeProcess->state() != QProcess::Running) {
+    addChatMessage("Not connected to backend. Cannot send blink command.", false);
+    return;
+  }
+
+  // Create command to send blink request to backend
+  QJsonObject jsonCommand;
+  jsonCommand["command"] = "blink_request";
+  jsonCommand["test"] = test;
+  jsonCommand["action"] = action;
+  jsonCommand["timestamp"] = QDateTime::currentMSecsSinceEpoch();
+  
+  QJsonDocument doc(jsonCommand);
+  QString jsonString = doc.toJson(QJsonDocument::Compact);
+  
+  qDebug() << "🔘 Sending blink request to Node.js backend:" << jsonString.left(200) + "...";
+  m_nodeProcess->write(jsonString.toUtf8() + "\n");
+  
+  addChatMessage("Blink command sent to backend.", false);
+}

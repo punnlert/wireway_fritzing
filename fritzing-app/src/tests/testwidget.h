@@ -37,6 +37,7 @@ private slots:
 signals:
     void testResultsSubmitted(const QString &groupId, const QJsonObject &results);
     void testResultsSubmittedToBackend(const QString &groupId, const QJsonObject &results);
+    void blinkRequested(const QJsonObject &test, const QString &action);
     void testGroupsRequested();
     void blinkBoardConnectionRequested();
     void testsRequested();
@@ -46,6 +47,7 @@ private:
     void setupConnections();
     void createTestGroupCard(const QJsonObject &testGroup);
     QLineEdit* createSelfObserveTestDisplay(const QJsonObject &test, QWidget *parent, QVBoxLayout *parentLayout);
+    void createMeasureVoltageTestDisplay(const QJsonObject &test, QWidget *parent, QVBoxLayout *parentLayout);
     void clearCards();
     
     // Backend handling

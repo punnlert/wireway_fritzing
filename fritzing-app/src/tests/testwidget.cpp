@@ -200,6 +200,9 @@ void TestWidget::createTestGroupCard(const QJsonObject &testGroup)
                     testInputs.append(input);
                     testData.append(test);
                 }
+            } else if (testType == "measure_voltage") {
+                createMeasureVoltageTestDisplay(test, card, cardLayout);
+                testData.append(test);
             } else {
                 // Minimal display for other test types
                 QString testName = test["name"].toString();
@@ -304,10 +307,9 @@ QLineEdit* TestWidget::createSelfObserveTestDisplay(const QJsonObject &test, QWi
     blinkButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
     
     // Connect blink button (placeholder for now)
-    connect(blinkButton, &QPushButton::clicked, [this, test, observationInput]() {
-        qDebug() << "🔘 Blink button clicked for test:" << test["title"].toString();
-        qDebug() << "📝 User observation:" << observationInput->text();
-        // TODO: Implement blink functionality
+    connect(blinkButton, &QPushButton::clicked, [this, test]() {
+        qDebug() << "🔘 Blink button clicked for self observe test:" << test["title"].toString();
+        emit blinkRequested(test, "blink");
     });
     
     inputLayout->addWidget(blinkButton);
@@ -318,4 +320,78 @@ QLineEdit* TestWidget::createSelfObserveTestDisplay(const QJsonObject &test, QWi
     
     qDebug() << "✅ Self observation test displayed in TestWidget:" << test["title"].toString();
     return observationInput; // Return the input field
+}
+
+void TestWidget::createMeasureVoltageTestDisplay(const QJsonObject &test, QWidget *parent, QVBoxLayout *parentLayout)
+{
+    // Create test container widget
+    QFrame *testWidget = new QFrame(parent);
+    testWidget->setStyleSheet("QFrame { background-color: #d6d6d6; padding: 5px; margin: 5px; }");
+    
+    QVBoxLayout *testLayout = new QVBoxLayout(testWidget);
+    testLayout->setContentsMargins(10, 10, 10, 10);
+    testLayout->setSpacing(2);
+    
+    // Test title
+    QLabel *titleLabel = new QLabel(test["title"].toString());
+    titleLabel->setStyleSheet("QLabel { font-family: 'Droid Sans'; font-size: 12px; font-weight: bold; color: #333; }");
+    testLayout->addWidget(titleLabel);
+    
+    // Test description
+    QLabel *descLabel = new QLabel(test["description"].toString());
+    descLabel->setStyleSheet("QLabel { font-family: 'Droid Sans'; font-size: 10px; color: #666; }");
+    descLabel->setWordWrap(true);
+    testLayout->addWidget(descLabel);
+    
+    // Graph placeholder area (middle section)
+    QFrame *graphFrame = new QFrame(testWidget);
+    graphFrame->setStyleSheet("QFrame { background-color: white; border: 2px dashed #ccc; border-radius: 5px; min-height: 120px; }");
+    graphFrame->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    
+    QVBoxLayout *graphLayout = new QVBoxLayout(graphFrame);
+    graphLayout->setContentsMargins(10, 10, 10, 10);
+    
+    QLabel *graphPlaceholder = new QLabel("Graph will be displayed here", graphFrame);
+    graphPlaceholder->setStyleSheet("QLabel { font-family: 'Droid Sans'; font-size: 10px; color: #999; }");
+    graphPlaceholder->setAlignment(Qt::AlignCenter);
+    graphLayout->addWidget(graphPlaceholder);
+    
+    testLayout->addWidget(graphFrame);
+    
+    // Button area (bottom section)
+    QHBoxLayout *buttonLayout = new QHBoxLayout();
+    buttonLayout->setSpacing(10);
+    
+    // Blink button
+    QPushButton *blinkButton = new QPushButton("Blink", testWidget);
+    blinkButton->setStyleSheet("QPushButton { padding: 6px 12px; background: #f23926; color: white; border: none; border-radius: 3px; font-family: 'Droid Sans'; font-size: 10px; } QPushButton:hover { background: #d32f2f; } QPushButton:pressed { background: #b71c1c; }");
+    blinkButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    
+    // Connect blink button (placeholder for now)
+    connect(blinkButton, &QPushButton::clicked, [this, test]() {
+        qDebug() << "🔘 Blink button clicked for measure voltage test:" << test["title"].toString();
+        emit blinkRequested(test, "blink");
+    });
+    
+    // Measure button
+    QPushButton *measureButton = new QPushButton("Measure", testWidget);
+    measureButton->setStyleSheet("QPushButton { padding: 6px 12px; background: #0078d4; color: white; border: none; border-radius: 3px; font-family: 'Droid Sans'; font-size: 10px; } QPushButton:hover { background: #005a9e; } QPushButton:pressed { background: #004578; }");
+    measureButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    
+    // Connect measure button (placeholder for now)
+    connect(measureButton, &QPushButton::clicked, [this, test]() {
+        qDebug() << "📊 Measure button clicked for measure voltage test:" << test["title"].toString();
+        // TODO: Implement measure functionality
+    });
+    
+    buttonLayout->addWidget(blinkButton);
+    buttonLayout->addWidget(measureButton);
+    buttonLayout->addStretch(); // Push buttons to the left
+    
+    testLayout->addLayout(buttonLayout);
+    
+    // Add test widget to parent layout
+    parentLayout->addWidget(testWidget);
+    
+    qDebug() << "✅ Measure voltage test displayed in TestWidget:" << test["title"].toString();
 }

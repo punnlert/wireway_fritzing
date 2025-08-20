@@ -45,8 +45,8 @@ let testGroups = []; // Store test groups for the test window
 let serialPorts = [];
 let blinkboard_serial_port;
 
-const gpt_model = "gpt-4o-mini";
-// const gpt_model = "o4-mini";
+// const gpt_model = "gpt-4o-mini";
+const gpt_model = "o4-mini";
 
 // Helper function to create error responses with line numbers
 function createErrorResponse(error, lineNumber) {
@@ -83,9 +83,11 @@ const tools = [
                 "pins that you want to blink to better support your message",
             },
           },
+          required: ["pin"],
+          additionalProperties: false,
         },
       },
-      required: ["title", "description"],
+      required: ["title", "description", "jsondata"],
       additionalProperties: false,
     },
     strict: true,
@@ -111,7 +113,7 @@ const tools = [
               type: "string",
               description:
                 "you can decide by yourself which pin to use for measuring. this is the blinkboard built-in adc pins",
-              enum: ["A0", "A1", "A2"],
+              enum: ["a0", "a1", "a2"],
             },
             measure_row: {
               type: "number",
@@ -131,12 +133,8 @@ const tools = [
   },
 ];
 
-function add_measure_voltage_test({ title, description, jsondata }) {
-  console.log("add_measure_voltage_test", title, description, jsondata);
-}
-
 function add_self_observe_test({ title, description, jsondata }) {
-  console.log("add_self_observe_test", title, description, jsondata);
+  // console.log("add_self_observe_test", title, description, jsondata);
 
   // Find the latest test group and add the new test
   if (testGroups.length > 0) {
@@ -177,6 +175,44 @@ function add_self_observe_test({ title, description, jsondata }) {
 
 function add_measure_voltage_test({ title, description, jsondata }) {
   console.log("add_measure_voltage_test", title, description, jsondata);
+
+  // Find the latest test group and add the new test
+  if (testGroups.length > 0) {
+    const latestGroup = testGroups[testGroups.length - 1];
+
+    // Create new test object
+    const newTest = {
+      id: `test_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      type: "measure_voltage",
+      title: title,
+      description: description,
+      jsondata: jsondata || {},
+      measurePin: jsondata?.measure_pin || "A0",
+      measureRow: jsondata?.measure_row || 1,
+      completed: false,
+      voltageData: [], // Will store voltage measurements
+    };
+
+    // Add test to the latest group
+    latestGroup.tests.push(newTest);
+
+    console.log(
+      `✅ Added measure voltage test "${title}" to group "${latestGroup.title}"`
+    );
+
+    // Emit test groups updated event to frontend
+    process.stdout.write(
+      JSON.stringify({
+        type: "test_groups_updated",
+        testGroups: testGroups,
+        timestamp: Date.now(),
+      }) + "\n"
+    );
+  } else {
+    console.log(
+      "⚠️ No test groups available. Cannot add measure voltage test."
+    );
+  }
 }
 
 class EventHandler extends EventEmitter {
@@ -469,6 +505,34 @@ function write_json_to_port(json) {
   });
 }
 
+function blink_row(row, pattern) {
+  write_json_to_port({
+    cmd: "setLed",
+    led: row,
+    pattern: pattern,
+  });
+}
+
+function blink_rows(rows, pattern) {
+  rows.forEach((row) => {
+    blink_row(row, pattern);
+  });
+}
+
+function blink_command_pin(pin, pattern) {
+  write_json_to_port({
+    cmd: "setCmdLed",
+    led: pin,
+    pattern: pattern,
+  });
+}
+
+function blink_command_pins(pins, pattern) {
+  pins.forEach((pin) => {
+    blink_command_pin(pin, pattern);
+  });
+}
+
 async function send_openai_message(message) {
   const eventHandler = new EventHandler(openai);
   eventHandler.on("event", eventHandler.onEvent.bind(eventHandler));
@@ -480,7 +544,7 @@ async function send_openai_message(message) {
     });
   }
 
-  console.log("schematic_file_change", schematic_file_change);
+  // console.log("schematic_file_change", schematic_file_change);
 
   if (schematic_file_change) {
     const update_schematics = `this is the .yaml representation of the schematics \n ${schematics} \n `;
@@ -490,7 +554,7 @@ async function send_openai_message(message) {
       content: update_schematics,
     });
 
-    console.log("update_schematics", update_schematics);
+    // console.log("update_schematics", update_schematics);
 
     schematic_file_change = false;
   }
@@ -512,7 +576,7 @@ async function send_openai_message(message) {
     tools,
   };
 
-  console.log("create_param", create_param);
+  // console.log("create_param", create_param);
 
   const response = await openai.responses.create(create_param);
 
@@ -616,10 +680,10 @@ async function processCommand(command) {
     case "init":
       // Detect serial ports and send them along with initialization
       serialPorts = await detectSerialPorts();
-      console.log(
-        `🔌 Detected ${serialPorts.length} serial ports:`,
-        serialPorts
-      );
+      // console.log(
+      //   `🔌 Detected ${serialPorts.length} serial ports:`,
+      //   serialPorts
+      // );
 
       return {
         status: "success",
@@ -679,21 +743,7 @@ async function processCommand(command) {
     case "submit_test_results":
       try {
         const { groupId, results } = command;
-        console.log(`📝 Received test results for group ${groupId}:`, results);
-
-        // Store the test results (you can modify this to save to file/database)
-        // For now, just log them
-        // console.log("Test Results Summary:");
-        // if (results.testResults && Array.isArray(results.testResults)) {
-        //   results.testResults.forEach((testResult, index) => {
-        //     console.log(`  Test ${index + 1}:`);
-        //     console.log(`    Name: ${testResult.name}`);
-        //     console.log(`    Description: ${testResult.description}`);
-        //     console.log(`    ID: ${testResult.id}`);
-        //     console.log(`    Answer: ${testResult.answer}`);
-        //     console.log("");
-        //   });
-        // }
+        // console.log(`📝 Received test results for group ${groupId}:`, results);
 
         const message = `this is the test results that we have run. \n ${JSON.stringify(
           results
@@ -710,6 +760,35 @@ async function processCommand(command) {
         };
       } catch (error) {
         return createErrorResponse(error, 650); // Line number for submit_test_results
+      }
+
+    case "blink_request":
+      try {
+        const { test, action } = command;
+        console.log(`🔘 Received blink request for test: ${test.title}`);
+        console.log(`Action: ${action}`);
+        console.log(`Test data:`, test);
+
+        if (test.type === "self_observe") {
+          blink_rows(test.jsondata.pin, "blink");
+        } else if (test.type === "measure_voltage") {
+          blink_command_pin(test.jsondata.measure_pin, "blink");
+          blink_row(test.jsondata.measure_row, "blink");
+        }
+
+        setTimeout(() => {
+          write_json_to_port({
+            cmd: "reset",
+          });
+        }, 10000);
+
+        return {
+          status: "success",
+          message: `Blink request processed for test: ${test.title}`,
+          timestamp: Date.now(),
+        };
+      } catch (error) {
+        return createErrorResponse(error, 700); // Line number for blink_request
       }
 
     case "add_test_group":
@@ -738,7 +817,7 @@ async function processCommand(command) {
     case "get_serial_ports":
       // Refresh and return available serial ports
       serialPorts = await detectSerialPorts();
-      console.log(`🔌 Refreshed serial ports: ${serialPorts.length} found`);
+      // console.log(`🔌 Refreshed serial ports: ${serialPorts.length} found`);
       return {
         status: "success",
         message: "Serial ports refreshed",
@@ -816,27 +895,49 @@ process.on("unhandledRejection", (reason, promise) => {
 
 // Initialize with some sample test groups
 testGroups = [
-  // {
-  //   id: "1",
-  //   title: "Circuit Validation Tests",
-  //   description:
-  //     "Basic validation tests for circuit components and connections",
-  //   tests: [
-  //     {
-  //       name: "Component Connection Test",
-  //       description: "Verify all components are properly connected",
-  //     },
-  //     {
-  //       name: "Power Supply Test",
-  //       description: "Check power supply connections and voltage levels",
-  //     },
-  //     {
-  //       name: "Signal Flow Test",
-  //       description: "Validate signal paths through the circuit",
-  //     },
-  //   ],
-  //   timestamp: Date.now(),
-  // },
+  {
+    id: "1",
+    title: "Circuit Validation Tests",
+    description:
+      "Basic validation tests for circuit components and connections",
+    tests: [
+      // {
+      //   name: "Component Connection Test",
+      //   description: "Verify all components are properly connected",
+      // },
+      // {
+      //   name: "Power Supply Test",
+      //   description: "Check power supply connections and voltage levels",
+      // },
+      // {
+      //   name: "Signal Flow Test",
+      //   description: "Validate signal paths through the circuit",
+      // },
+      {
+        id: "so_demo_1",
+        type: "self_observe",
+        title: "When you press the button, what does the LED do?",
+        description:
+          "Press and release the button a few times and describe the LED behavior.",
+        jsondata: { pin: [10] },
+        userObservation: "",
+        completed: false,
+      },
+      {
+        id: "mv_demo_1",
+        type: "measure_voltage",
+        title: "Measure voltage at row 15 using A0",
+        description:
+          "Rotate the potentiometer from end to end while measuring the voltage.",
+        jsondata: { measure_pin: "a0", measure_row: 15 },
+        measurePin: "a0",
+        measureRow: 15,
+        completed: false,
+        voltageData: [],
+      },
+    ],
+    timestamp: Date.now(),
+  },
   // {
   //   id: "2",
   //   title: "Performance Tests",
