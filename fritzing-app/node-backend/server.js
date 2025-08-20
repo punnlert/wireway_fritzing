@@ -6,8 +6,10 @@ const path = require("path");
 require("dotenv").config({ path: path.join(__dirname, ".env") });
 const { OpenAI } = require("openai");
 const { parseString } = require("xml2js");
+const { ReadlineParser } = require("@serialport/parser-readline");
 const yaml = require("yaml");
 const { spawn } = require("child_process");
+const { SerialPort } = require("serialport");
 
 const SYSTEM_INSTRUCTION = `You are a teacher assistant in an online interaction prototyping class. The class utilize a tool called "BlinkBoard"; a breadboard with built-in LEDs in each row that can light up to signify to the user which row of the board the instructor is referring to. Each connection hole in the BlinkBoard has a specific coordinate in the form of [row, column]. the coordinate maps to the following schema on the Blinkboard;
 Blinkboard Schematics
@@ -37,6 +39,24 @@ let openai_chat_history = [];
 let schematics;
 let schematic_file_change = false;
 let testGroups = []; // Store test groups for the test window
+
+// Serial port detection
+let serialPorts = [];
+let blinkboard_serial_port;
+
+// Helper function to create error responses with line numbers
+function createErrorResponse(error, lineNumber) {
+  const errorInfo = lineNumber
+    ? `${error.message} (at line ${lineNumber})`
+    : error.message;
+
+  return {
+    status: "error",
+    error: errorInfo,
+    timestamp: Date.now(),
+    lineNumber: lineNumber,
+  };
+}
 
 let create_param = {
   // model: 'o4-mini',
@@ -109,6 +129,91 @@ async function update_schematics(netlist) {
   });
 }
 
+function serial_port_on_data(data) {
+  console.log("Serial port data:", data);
+}
+
+function connect_serial_port(port_path) {
+  try {
+    console.log(`🔌 Attempting to connect to serial port: ${port_path}`);
+
+    blinkboard_serial_port = new SerialPort({
+      path: port_path,
+      baudRate: 115200,
+    });
+
+    blinkboard_serial_port.on("open", () => {
+      console.log("✅ Serial port opened successfully");
+      setTimeout(() => {
+        init_blinkboard_sequence();
+      }, 100);
+    });
+
+    blinkboard_serial_port.on("error", (error) => {
+      console.error("❌ Serial port error:", error.message);
+      console.error(
+        "Error occurred in connect_serial_port function at line ~137"
+      );
+    });
+
+    const parser = blinkboard_serial_port.pipe(
+      new ReadlineParser({ delimiter: "\r\n" })
+    );
+
+    parser.on("data", (data) => {
+      try {
+        const parsedData = JSON.parse(data);
+        serial_port_on_data(parsedData);
+      } catch (parseError) {
+        console.error(
+          "❌ Failed to parse serial port data:",
+          parseError.message
+        );
+        console.error("Raw data received:", data);
+        console.error("Error occurred in parser.on('data') at line ~150");
+      }
+    });
+
+    parser.on("error", (error) => {
+      console.error("❌ Parser error:", error.message);
+      console.error("Error occurred in parser.on('error') at line ~155");
+    });
+  } catch (error) {
+    console.error("❌ Failed to create serial port connection:", error.message);
+    console.error(
+      "Error occurred in connect_serial_port function at line ~137"
+    );
+    return null;
+  }
+}
+
+function init_blinkboard_sequence() {
+  write_json_to_port({
+    cmd: "status",
+  }); // sent to avoid parse fail
+  write_json_to_port({
+    cmd: "status",
+  });
+  write_json_to_port({
+    cmd: "reset",
+  });
+  write_json_to_port({ cmd: "setLed", led: "1", pattern: "blink2" });
+}
+
+function write_json_to_port(json) {
+  if (!blinkboard_serial_port) return;
+  const to_write = `${JSON.stringify(json)}\n\r`;
+  console.log("Writing to serial port:", to_write);
+  blinkboard_serial_port.write(to_write, (error) => {
+    if (error) {
+      console.error("❌ Error writing to serial port:", error.message);
+      console.error(
+        "Error occurred in write_json_to_port function at line ~206"
+      );
+    }
+  });
+}
+
 async function send_openai_message(message) {
   if (openai_chat_history.length == 0) {
     openai_chat_history.push({
@@ -139,6 +244,46 @@ async function send_openai_message(message) {
   return response.output[0].content[0].text;
 }
 
+// Function to detect available serial ports
+async function detectSerialPorts() {
+  try {
+    // Use system commands to detect serial ports
+    const { exec } = require("child_process");
+
+    return new Promise((resolve, reject) => {
+      // macOS: use ls command to check /dev/tty.*
+      exec("ls /dev/tty.*", (error, stdout, stderr) => {
+        if (error) {
+          console.log("macOS serial port detection failed:", error.message);
+          console.log("Error occurred in serial port detection function");
+          resolve([]);
+          return;
+        }
+
+        const ports = [];
+        const lines = stdout.split("\n");
+        for (const line of lines) {
+          if (
+            line.trim() &&
+            !line.includes("tty.Bluetooth") &&
+            !line.includes("tty.Modem")
+          ) {
+            ports.push({
+              path: line.trim(),
+              manufacturer: "Unknown",
+              serialNumber: "Unknown",
+            });
+          }
+        }
+        resolve(ports);
+      });
+    });
+  } catch (error) {
+    console.error("Serial port detection error:", error);
+    return [];
+  }
+}
+
 // Create readline interface for stdin/stdout communication
 const rl = readline.createInterface({
   input: process.stdin,
@@ -162,11 +307,7 @@ rl.on("line", async (line) => {
     console.log(JSON.stringify(response));
   } catch (error) {
     console.error("Error parsing command:", error.message);
-    const errorResponse = {
-      status: "error",
-      error: error.message,
-      timestamp: Date.now(),
-    };
+    const errorResponse = createErrorResponse(error, 1); // Line 1 for command parsing
     console.log(JSON.stringify(errorResponse));
   }
 });
@@ -177,11 +318,19 @@ async function processCommand(command) {
 
   switch (cmd) {
     case "init":
+      // Detect serial ports and send them along with initialization
+      serialPorts = await detectSerialPorts();
+      console.log(
+        `🔌 Detected ${serialPorts.length} serial ports:`,
+        serialPorts
+      );
+
       return {
         status: "success",
         message: "Backend initialized successfully",
         timestamp: Date.now(),
         version: "1.0.0",
+        serialPorts: serialPorts,
       };
 
     case "ping":
@@ -220,11 +369,7 @@ async function processCommand(command) {
           timestamp: Date.now(),
         };
       } catch (error) {
-        return {
-          status: "error",
-          error: error.message,
-          timestamp: Date.now(),
-        };
+        return createErrorResponse(error, 320); // Line number for update_schematics
       }
 
     case "get_test_groups":
@@ -253,11 +398,10 @@ async function processCommand(command) {
           timestamp: Date.now(),
         };
       } else {
-        return {
-          status: "error",
-          error: "No test group data provided",
-          timestamp: Date.now(),
-        };
+        return createErrorResponse(
+          new Error("No test group data provided"),
+          365
+        );
       }
 
     case "submit_test_results":
@@ -273,11 +417,47 @@ async function processCommand(command) {
           timestamp: Date.now(),
         };
       } else {
+        return createErrorResponse(
+          new Error("Missing group ID or results data"),
+          385
+        );
+      }
+
+    case "get_serial_ports":
+      // Refresh and return available serial ports
+      serialPorts = await detectSerialPorts();
+      console.log(`🔌 Refreshed serial ports: ${serialPorts.length} found`);
+      return {
+        status: "success",
+        message: "Serial ports refreshed",
+        serialPorts: serialPorts,
+        timestamp: Date.now(),
+      };
+
+    case "blinkboard_connect":
+      // Handle BlinkBoard connection request
+      const { selectedPort } = command;
+      if (selectedPort) {
+        console.log(
+          `🔌 BlinkBoard connection requested to port: ${selectedPort}`
+        );
+
+        console.log("Connecting to serial port:", selectedPort);
+
+        connect_serial_port(selectedPort);
+
         return {
-          status: "error",
-          error: "Missing group ID or results data",
+          status: "success",
+          message: `BlinkBoard connection initiated to ${selectedPort}`,
+          command: "blinkboard_connect",
+          selectedPort: selectedPort,
           timestamp: Date.now(),
         };
+      } else {
+        return createErrorResponse(
+          new Error("No serial port selected for BlinkBoard connection"),
+          415
+        );
       }
 
     default:
@@ -295,11 +475,7 @@ async function processCommand(command) {
         };
       }
 
-      return {
-        status: "error",
-        message: `Unknown command: ${cmd}`,
-        timestamp: Date.now(),
-      };
+      return createErrorResponse(new Error(`Unknown command: ${cmd}`), 435);
   }
 }
 

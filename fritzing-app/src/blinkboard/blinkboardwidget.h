@@ -13,6 +13,10 @@
 #include <QTextEdit>
 #include <QLineEdit>
 #include <QHBoxLayout>
+#include <QTimer>
+#include <QLabel>
+#include <QDialog>
+#include <QComboBox>
 
 class BlinkBoardWidget : public QScrollArea {
   Q_OBJECT
@@ -26,6 +30,9 @@ public:
   // Helper methods for accessing sketch data
   QString currentNetlistXml() const;
   QString breadboardNetlistXml() const;
+
+public slots:
+  void handleBlinkBoardConnectionRequest();
 
 protected slots:
   void handleButtonClick();
@@ -43,6 +50,12 @@ protected:
   QVBoxLayout *m_mainLayout;
   QProcess *m_nodeProcess;
   
+  // Status indicator
+  QLabel *m_statusIndicator;
+  
+  // Serial ports
+  QJsonArray m_serialPorts;
+  
   // Chat interface elements
   QTextEdit *m_chatDisplay;
   QLineEdit *m_messageInput;
@@ -53,5 +66,11 @@ protected:
   void startNodeBackend();
   void sendCommandToNode(const QString &command);
   void addChatMessage(const QString &message, bool isUser = true);
+  void updateButtonColor(bool isConnected);
+  
+  // Serial port handling
+  void handleSerialPortsReceived(const QJsonArray &ports);
+  void showPortSelectionDialog();
+  void connectToSelectedPort(const QString &portPath);
 };
 #endif

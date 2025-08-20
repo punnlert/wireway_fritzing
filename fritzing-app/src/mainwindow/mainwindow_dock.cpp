@@ -240,6 +240,10 @@ void MainWindow::initDock() {
 
   // Initialize Test Widget
   m_testWidget = new TestWidget(this);
+  
+  // Connect TestWidget's BlinkBoard connection signal to BlinkBoardWidget
+  connect(m_testWidget, &TestWidget::blinkBoardConnectionRequested, 
+          m_blinkboardWidget, &BlinkBoardWidget::handleBlinkBoardConnectionRequest);
 
   // DebugDialog::debug("after creating bins");
   if (m_fileProgressDialog) {

@@ -67,6 +67,7 @@ saved_state
 .env
 
 */node_modules
+/node-backend/node_modules
 
 /parse-schematics/target
 

@@ -26,12 +26,13 @@ public slots:
     void clearTestGroups();
 
 private slots:
-    void onRefreshTestsClicked();
+    void onConnectBlinkBoardClicked();
     void onSubmitTestResults(const QString &groupId);
 
 signals:
     void testResultsSubmitted(const QString &groupId, const QJsonObject &results);
     void testGroupsRequested();
+    void blinkBoardConnectionRequested();
 
 private:
     void setupUI();

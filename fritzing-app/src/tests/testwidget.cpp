@@ -36,12 +36,12 @@ void TestWidget::setupUI()
     m_cardLayout->setContentsMargins(5, 5, 5, 5);
     m_cardLayout->setSpacing(15);
     
-    // Add refresh button at the top
-    QPushButton *refreshButton = new QPushButton("Refresh Test Groups", this);
-    refreshButton->setStyleSheet("QPushButton { padding: 8px 16px; background: #ececec; color: #323232; border: 1px solid #b1b1b1; border-radius: 0px; font-family: 'Droid Sans'; font-size: 11px; margin-bottom: 10px; } QPushButton:hover { background: #666666; color: #ffffff; } QPushButton:pressed { background: #f23926; color: #d9d9d9; }");
-    connect(refreshButton, &QPushButton::clicked, this, &TestWidget::onRefreshTestsClicked);
+    // Add BlinkBoard connection button at the top
+    QPushButton *blinkBoardButton = new QPushButton("Connect to BlinkBoard", this);
+    blinkBoardButton->setStyleSheet("QPushButton { padding: 8px 16px; background: #ececec; color: #323232; border: 1px solid #b1b1b1; border-radius: 0px; font-family: 'Droid Sans'; font-size: 11px; margin-bottom: 10px; } QPushButton:hover { background: #666666; color: #ffffff; } QPushButton:pressed { background: #f23926; color: #d9d9d9; }");
+    connect(blinkBoardButton, &QPushButton::clicked, this, &TestWidget::onConnectBlinkBoardClicked);
     
-    m_mainLayout->addWidget(refreshButton);
+    m_mainLayout->addWidget(blinkBoardButton);
     m_mainLayout->addWidget(scrollArea);
     
     scrollArea->setWidget(cardContainer);
@@ -88,9 +88,9 @@ void TestWidget::clearTestGroups()
 
 
 
-void TestWidget::onRefreshTestsClicked()
+void TestWidget::onConnectBlinkBoardClicked()
 {
-    emit testGroupsRequested();
+    emit blinkBoardConnectionRequested();
 }
 
 void TestWidget::onSubmitTestResults(const QString &groupId)

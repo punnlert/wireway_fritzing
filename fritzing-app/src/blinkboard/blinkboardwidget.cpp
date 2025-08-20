@@ -34,7 +34,7 @@ class ErcData;
 #include "../viewlayer.h"
 
 BlinkBoardWidget::BlinkBoardWidget(QWidget *parent)
-    : QScrollArea(parent), m_actionButton(new QPushButton(tr("Connect to Node.js Backend"))),
+    : QScrollArea(parent), m_actionButton(new QPushButton(tr("Restart Node.js Backend"))),
       m_mainLayout(new QVBoxLayout()),
       m_nodeProcess(new QProcess(this)),
       m_chatDisplay(new QTextEdit()),
@@ -80,7 +80,28 @@ BlinkBoardWidget::BlinkBoardWidget(QWidget *parent)
   m_inputLayout->setContentsMargins(0, 0, 0, 0); // Remove margins
 
   // Setup Node.js connection button (at bottom) - match Fritzing button style
+  // Create a horizontal layout for the button to include status indicator
+  QHBoxLayout *buttonLayout = new QHBoxLayout();
+  buttonLayout->setContentsMargins(8, 0, 8, 0);
+  buttonLayout->setSpacing(8);
+  
+  // Create status indicator circle
+  m_statusIndicator = new QLabel();
+  m_statusIndicator->setFixedSize(8, 8);
+  m_statusIndicator->setStyleSheet("QLabel { background-color: #f44336; border-radius: 4px; }");
+  
+  // Add status indicator and button text to layout
+  buttonLayout->addWidget(m_statusIndicator);
+  buttonLayout->addStretch();
+  
+  // Set the button layout
+  m_actionButton->setLayout(buttonLayout);
+  
+  // Set initial button styling
   m_actionButton->setStyleSheet("QPushButton { padding: 8px 16px; background: #ececec; color: #323232; border: 1px solid #b1b1b1; border-radius: 0px; font-family: 'Droid Sans'; font-size: 11px; margin-top: 10px; } QPushButton:hover { background: #666666; color: #ffffff; } QPushButton:pressed { background: #f23926; color: #d9d9d9; }");
+  
+  // Start with red indicator (not connected)
+  updateButtonColor(false);
 
   // Connect signals
   connect(m_actionButton, SIGNAL(clicked()), this, SLOT(handleButtonClick()));
@@ -158,8 +179,11 @@ void BlinkBoardWidget::handleButtonClick() {
     qDebug() << "Attempting to start Node.js backend...";
     startNodeBackend();
   } else {
-    qDebug() << "Node.js backend already running, sending ping...";
-    sendCommandToNode("ping");
+    qDebug() << "Node.js backend already running, restarting...";
+    // Kill the current process and restart
+    m_nodeProcess->kill();
+    // Wait a bit for the process to terminate
+    QTimer::singleShot(1000, this, &BlinkBoardWidget::startNodeBackend);
   }
 }
 
@@ -171,7 +195,7 @@ void BlinkBoardWidget::startNodeBackend() {
   QFileInfo nodeFileInfo(nodePath);
   if (!nodeFileInfo.exists() || !nodeFileInfo.isExecutable()) {
     qDebug() << "❌ Node.js not found at hardcoded path:" << nodePath;
-    m_actionButton->setText("Node.js Not Found");
+    updateButtonColor(false);
     return;
   }
   
@@ -203,7 +227,7 @@ void BlinkBoardWidget::startNodeBackend() {
   if (!fileInfo.exists()) {
     qDebug() << "❌ Server.js file not found at:" << serverPath;
     qDebug() << "Tried to find it in:" << sourcePath;
-    m_actionButton->setText("File Not Found - Check Path");
+    updateButtonColor(false);
     return;
   }
   
@@ -221,7 +245,8 @@ void BlinkBoardWidget::startNodeBackend() {
     qDebug() << "Process ID:" << m_nodeProcess->processId();
     qDebug() << "Process state:" << m_nodeProcess->state();
     
-    m_actionButton->setText("Connected - Click to Test");
+    // Update button to green (connected)
+    updateButtonColor(true);
     sendCommandToNode("init");
   } else {
     qDebug() << "❌ Failed to start Node.js backend!";
@@ -229,8 +254,8 @@ void BlinkBoardWidget::startNodeBackend() {
     qDebug() << "Process state:" << m_nodeProcess->state();
     qDebug() << "Exit code:" << m_nodeProcess->exitCode();
     
-    // Reset button text
-    m_actionButton->setText("Failed - Click to Retry");
+    // Update button to red (failed)
+    updateButtonColor(false);
   }
 }
 
@@ -270,6 +295,12 @@ void BlinkBoardWidget::handleNodeProcessOutput() {
           handleMessageReceived(message);
         }
       }
+      
+      // Check if this contains serial ports (from init or get_serial_ports)
+      if (response.contains("serialPorts")) {
+        QJsonArray ports = response["serialPorts"].toArray();
+        handleSerialPortsReceived(ports);
+      }
     } else {
       // Check if it's a raw chat message (non-JSON)
       if (line.startsWith("chat:")) {
@@ -291,6 +322,9 @@ void BlinkBoardWidget::handleNodeStarted() {
   qDebug() << "🎉 Node.js process started signal received!";
   qDebug() << "Process ID:" << m_nodeProcess->processId();
   qDebug() << "Process state:" << m_nodeProcess->state();
+  
+  // Update button to green (connected)
+  updateButtonColor(true);
 }
 
 void BlinkBoardWidget::handleNodeError(QProcess::ProcessError error) {
@@ -298,8 +332,8 @@ void BlinkBoardWidget::handleNodeError(QProcess::ProcessError error) {
   qDebug() << "Error string:" << m_nodeProcess->errorString();
   qDebug() << "Process state:" << m_nodeProcess->state();
   
-  // Update button text
-  m_actionButton->setText("Error - Click to Retry");
+  // Update button to red (error)
+  updateButtonColor(false);
 }
 
 void BlinkBoardWidget::handleNodeFinished(int exitCode, QProcess::ExitStatus exitStatus) {
@@ -308,8 +342,8 @@ void BlinkBoardWidget::handleNodeFinished(int exitCode, QProcess::ExitStatus exi
   qDebug() << "Exit status:" << exitStatus;
   qDebug() << "Process state:" << m_nodeProcess->state();
   
-  // Reset button text
-  m_actionButton->setText("Disconnected - Click to Connect");
+  // Update button to red (disconnected)
+  updateButtonColor(false);
   
   // Add chat message about disconnection
   addChatMessage("Node.js backend disconnected.", false);
@@ -541,4 +575,114 @@ QString BlinkBoardWidget::breadboardNetlistXml() const {
     return doc.toString(-1);
   }
   return QString();
+}
+
+void BlinkBoardWidget::updateButtonColor(bool isConnected) {
+  if (isConnected) {
+    // Green circle when connected
+    m_statusIndicator->setStyleSheet("QLabel { background-color: #4CAF50; border-radius: 4px; }");
+  } else {
+    // Red circle when not connected
+    m_statusIndicator->setStyleSheet("QLabel { background-color: #f44336; border-radius: 4px; }");
+  }
+}
+
+void BlinkBoardWidget::handleSerialPortsReceived(const QJsonArray &ports) {
+  m_serialPorts = ports;
+  qDebug() << "🔌 Received" << ports.size() << "serial ports from backend";
+  
+  if (ports.isEmpty()) {
+    addChatMessage("No serial ports detected. Please check your BlinkBoard connection.", false);
+  } else {
+    QString portList = "Available serial ports:\n";
+    for (const QJsonValue &value : ports) {
+      QJsonObject port = value.toObject();
+      portList += QString("• %1\n").arg(port["path"].toString());
+    }
+    addChatMessage(portList, false);
+    
+    // Show port selection dialog
+    showPortSelectionDialog();
+  }
+}
+
+void BlinkBoardWidget::showPortSelectionDialog() {
+  if (m_serialPorts.isEmpty()) {
+    addChatMessage("No serial ports available for selection.", false);
+    return;
+  }
+  
+  // Create a simple port selection dialog
+  QDialog *dialog = new QDialog(this);
+  dialog->setWindowTitle("Select BlinkBoard Port");
+  dialog->setModal(true);
+  
+  QVBoxLayout *layout = new QVBoxLayout(dialog);
+  
+  QLabel *label = new QLabel("Select the serial port for your BlinkBoard:", dialog);
+  layout->addWidget(label);
+  
+  QComboBox *portCombo = new QComboBox(dialog);
+  for (const QJsonValue &value : m_serialPorts) {
+    QJsonObject port = value.toObject();
+    portCombo->addItem(port["path"].toString());
+  }
+  layout->addWidget(portCombo);
+  
+  QHBoxLayout *buttonLayout = new QHBoxLayout();
+  QPushButton *connectButton = new QPushButton("Connect", dialog);
+  QPushButton *cancelButton = new QPushButton("Cancel", dialog);
+  
+  buttonLayout->addWidget(connectButton);
+  buttonLayout->addWidget(cancelButton);
+  layout->addLayout(buttonLayout);
+  
+  // Connect signals
+  connect(connectButton, &QPushButton::clicked, [this, dialog, portCombo]() {
+    QString selectedPort = portCombo->currentText();
+    connectToSelectedPort(selectedPort);
+    dialog->accept();
+  });
+  
+  connect(cancelButton, &QPushButton::clicked, dialog, &QDialog::reject);
+  
+  dialog->exec();
+}
+
+void BlinkBoardWidget::connectToSelectedPort(const QString &portPath) {
+  qDebug() << "🔌 Connecting to BlinkBoard on port:" << portPath;
+  
+  addChatMessage(QString("Connecting to BlinkBoard on %1...").arg(portPath), false);
+  
+  // Send connection command to backend with selected port
+  QJsonObject jsonCommand;
+  jsonCommand["command"] = "blinkboard_connect";
+  jsonCommand["selectedPort"] = portPath;
+  jsonCommand["timestamp"] = QDateTime::currentMSecsSinceEpoch();
+  
+  QJsonDocument doc(jsonCommand);
+  QString jsonString = doc.toJson(QJsonDocument::Compact);
+  
+  qDebug() << "Sending BlinkBoard connection command:" << jsonString;
+  m_nodeProcess->write(jsonString.toUtf8() + "\n");
+}
+
+void BlinkBoardWidget::handleBlinkBoardConnectionRequest() {
+  qDebug() << "🔌 BlinkBoard connection requested from TestWidget";
+  
+  // Add a chat message about the connection request
+  addChatMessage("BlinkBoard connection requested from Test Widget", false);
+  
+  if (m_nodeProcess->state() == QProcess::Running) {
+    if (m_serialPorts.isEmpty()) {
+      // No ports available, request fresh list
+      addChatMessage("No serial ports available. Requesting fresh list...", false);
+      sendCommandToNode("get_serial_ports");
+    } else {
+      // Show port selection dialog
+      showPortSelectionDialog();
+    }
+  } else {
+    addChatMessage("Cannot connect to BlinkBoard - Node.js backend not running", false);
+  }
 }
