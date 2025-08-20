@@ -253,6 +253,10 @@ void MainWindow::initDock() {
   connect(m_blinkboardWidget, &BlinkBoardWidget::testsReceived, 
           m_testWidget, &TestWidget::updateTestGroups);
 
+  // Connect BlinkBoardWidget's test groups update signal to TestWidget's update method
+  connect(m_blinkboardWidget, &BlinkBoardWidget::testGroupsUpdated, 
+          m_testWidget, &TestWidget::handleTestGroupsUpdated);
+
   // DebugDialog::debug("after creating bins");
   if (m_fileProgressDialog) {
     m_fileProgressDialog->setValue(89);

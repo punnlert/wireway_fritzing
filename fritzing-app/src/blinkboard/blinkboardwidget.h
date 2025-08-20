@@ -37,6 +37,7 @@ public slots:
 
 signals:
   void testsReceived(const QJsonArray &tests);
+  void testGroupsUpdated(const QJsonArray &testGroups);
 
 protected slots:
   void handleButtonClick();
@@ -71,10 +72,6 @@ protected:
   QPushButton *m_updateSchematicsButton;
   QHBoxLayout *m_inputLayout;
   
-  // Test display area
-  QWidget *m_testDisplayArea;
-  QVBoxLayout *m_testLayout;
-  
   // Loading indicator for AI responses
   void startNodeBackend();
   void sendCommandToNode(const QString &command);
@@ -84,11 +81,6 @@ protected:
   // Simple streaming status handling
   void handleStreamingStart();
   void handleStreamingDone();
-  
-  // Test handling
-  void handleTestGroupsUpdated(const QJsonArray &testGroups);
-  void displayTests(const QJsonArray &testGroups);
-  void displaySelfObserveTest(const QJsonObject &test);
   
   // Serial port handling
   void handleSerialPortsReceived(const QJsonArray &ports);

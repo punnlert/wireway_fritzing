@@ -25,6 +25,7 @@ public slots:
     void addTestGroup(const QJsonObject &testGroup);
     void clearTestGroups();
     void requestTestsFromBackend();
+    void handleTestGroupsUpdated(const QJsonArray &testGroups);
 
 private slots:
     void onConnectBlinkBoardClicked();
@@ -42,6 +43,7 @@ private:
     void setupUI();
     void setupConnections();
     void createTestGroupCard(const QJsonObject &testGroup);
+    void createSelfObserveTestDisplay(const QJsonObject &test, QWidget *parent, QVBoxLayout *parentLayout);
     void clearCards();
     
     // Backend handling

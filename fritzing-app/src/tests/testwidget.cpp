@@ -1,6 +1,7 @@
 #include "testwidget.h"
 #include <QMessageBox>
 #include <QDateTime>
+#include <QLineEdit>
 
 TestWidget::TestWidget(QWidget *parent)
     : QWidget(parent)
@@ -136,7 +137,7 @@ void TestWidget::createTestGroupCard(const QJsonObject &testGroup)
     // Create card container
     QFrame *card = new QFrame(this);
     card->setFrameStyle(QFrame::Box);
-    card->setStyleSheet("QFrame { background-color: rgb(243, 243, 243); border: 1px solid #b1b1b1; border-radius: 0px; padding: 15px; margin: 5px; }");
+    card->setStyleSheet("QFrame { background-color: rgb(243, 243, 243); border: 1px solid #b1b1b1; border-radius: 0px; padding: 5px; margin: 5px; }");
     
     QVBoxLayout *cardLayout = new QVBoxLayout(card);
     cardLayout->setContentsMargins(15, 15, 15, 15);
@@ -159,31 +160,7 @@ void TestWidget::createTestGroupCard(const QJsonObject &testGroup)
     // Tests to be performed (middle section)
     QJsonArray tests = testGroup["tests"].toArray();
     if (!tests.isEmpty()) {
-        for (const QJsonValue &testValue : tests) {
-            QJsonObject test = testValue.toObject();
-            QString testName = test["name"].toString();
-            QString testDesc = test["description"].toString();
-            
-            QFrame *testItem = new QFrame(card);
-            testItem->setStyleSheet("QFrame { background-color: #ececec; border: 1px solid #d0d0d0; border-radius: 0px; padding: 8px; margin: 2px; }");
-            
-            QVBoxLayout *testLayout = new QVBoxLayout(testItem);
-            testLayout->setContentsMargins(8, 8, 8, 8);
-            testLayout->setSpacing(4);
-            
-            QLabel *testNameLabel = new QLabel(testName, testItem);
-            testNameLabel->setStyleSheet("QLabel { font-family: 'Droid Sans'; font-size: 11px; font-weight: bold; color: #323232; }");
-            
-            if (!testDesc.isEmpty()) {
-                QLabel *testDescLabel = new QLabel(testDesc, testItem);
-                testDescLabel->setStyleSheet("QLabel { font-family: 'Droid Sans'; font-size: 10px; color: #666666; }");
-                testDescLabel->setWordWrap(true);
-                testLayout->addWidget(testDescLabel);
-            }
-            
-            testLayout->addWidget(testNameLabel);
-            cardLayout->addWidget(testItem);
-        }
+        // Tests will be handled in the tests section below
     }
     
     // Submit button (bottom section)
@@ -202,8 +179,52 @@ void TestWidget::createTestGroupCard(const QJsonObject &testGroup)
     
     if (!tests.isEmpty()) {
         QLabel *testsLabel = new QLabel("Tests to perform:", card);
-        testsLabel->setStyleSheet("QLabel { font-family: 'Droid Sans'; font-size: 11px; font-weight: bold; color: #323232; margin-top: 10px; }");
+        testsLabel->setStyleSheet("QLabel { font-family: 'Droid Sans'; font-size: 11px; font-weight: bold; color: #323232; margin-top: 5px; }");
         cardLayout->addWidget(testsLabel);
+        
+        // Add tests section
+        QFrame *testsSection = new QFrame(card);
+        testsSection->setStyleSheet("QFrame { background-color: #f8f8f8; border: none; border-radius: 3px; padding: 10px; margin: 5px 0px; }");
+        QVBoxLayout *testsSectionLayout = new QVBoxLayout(testsSection);
+        testsSectionLayout->setContentsMargins(10, 10, 10, 10);
+        testsSectionLayout->setSpacing(8);
+        
+        // Add each test to the tests section
+        for (const QJsonValue &testValue : tests) {
+            QJsonObject test = testValue.toObject();
+            QString testType = test["type"].toString();
+            
+            if (testType == "self_observe") {
+                // Create self observation test display
+                createSelfObserveTestDisplay(test, testsSection, testsSectionLayout);
+            } else {
+                // Handle other test types (legacy support)
+                QString testName = test["name"].toString();
+                QString testDesc = test["description"].toString();
+                
+                QFrame *testItem = new QFrame(testsSection);
+                testItem->setStyleSheet("QFrame { background-color: #ececec; border: 1px solid #d0d0d0; border-radius: 0px; padding: 8px; margin: 2px; }");
+                
+                QVBoxLayout *testLayout = new QVBoxLayout(testItem);
+                testLayout->setContentsMargins(8, 8, 8, 8);
+                testLayout->setSpacing(4);
+                
+                QLabel *testNameLabel = new QLabel(testName, testItem);
+                testNameLabel->setStyleSheet("QLabel { font-family: 'Droid Sans'; font-size: 11px; font-weight: bold; color: #323232; }");
+                
+                if (!testDesc.isEmpty()) {
+                    QLabel *testDescLabel = new QLabel(testDesc, testItem);
+                    testDescLabel->setStyleSheet("QLabel { font-family: 'Droid Sans'; font-size: 10px; color: #666666; }");
+                    testDescLabel->setWordWrap(true);
+                    testLayout->addWidget(testDescLabel);
+                }
+                
+                testLayout->addWidget(testNameLabel);
+                testsSectionLayout->addWidget(testItem);
+            }
+        }
+        
+        cardLayout->addWidget(testsSection);
     }
     
     cardLayout->addWidget(submitButton);
@@ -216,6 +237,12 @@ void TestWidget::handleTestsReceived(const QJsonArray &tests)
 {
     qDebug() << "🧪 Received" << tests.size() << "test groups from backend";
     updateTestGroups(tests);
+}
+
+void TestWidget::handleTestGroupsUpdated(const QJsonArray &testGroups)
+{
+    qDebug() << "🧪 Test groups updated from backend";
+    updateTestGroups(testGroups);
 }
 
 void TestWidget::onConnectBackendClicked()
@@ -237,4 +264,57 @@ void TestWidget::requestTestsFromBackend()
     // This method can be called from BlinkBoardWidget to request tests
     // It will emit the signal that BlinkBoardWidget can listen to
     emit testsRequested();
+}
+
+void TestWidget::createSelfObserveTestDisplay(const QJsonObject &test, QWidget *parent, QVBoxLayout *parentLayout)
+{
+    // Create test container widget
+    QFrame *testWidget = new QFrame(parent);
+    testWidget->setStyleSheet("QFrame { background-color: #f5f5f5; border: 1px solid #ddd; border-radius: 5px; padding: 10px; margin: 5px; }");
+    
+    QVBoxLayout *testLayout = new QVBoxLayout(testWidget);
+    testLayout->setContentsMargins(10, 10, 10, 10);
+    testLayout->setSpacing(8);
+    
+    // Test title
+    QLabel *titleLabel = new QLabel(test["title"].toString());
+    titleLabel->setStyleSheet("QLabel { font-family: 'Droid Sans'; font-size: 12px; font-weight: bold; color: #333; }");
+    testLayout->addWidget(titleLabel);
+    
+    // Test description
+    QLabel *descLabel = new QLabel(test["description"].toString());
+    descLabel->setStyleSheet("QLabel { font-family: 'Droid Sans'; font-size: 10px; color: #666; }");
+    descLabel->setWordWrap(true);
+    testLayout->addWidget(descLabel);
+    
+    // Observation input area
+    QHBoxLayout *inputLayout = new QHBoxLayout();
+    inputLayout->setSpacing(10);
+    
+    // Text input for observation
+    QLineEdit *observationInput = new QLineEdit();
+    observationInput->setPlaceholderText("What did you observe?");
+    observationInput->setStyleSheet("QLineEdit { padding: 6px; border: 1px solid #ccc; border-radius: 3px; background: white; font-family: 'Droid Sans'; font-size: 10px; } QLineEdit:focus { border: 1px solid #f23926; }");
+    observationInput->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    inputLayout->addWidget(observationInput);
+    
+    // Blink button
+    QPushButton *blinkButton = new QPushButton("Blink");
+    blinkButton->setStyleSheet("QPushButton { padding: 6px 12px; background: #f23926; color: white; border: none; border-radius: 3px; font-family: 'Droid Sans'; font-size: 10px; } QPushButton:hover { background: #d32f2f; } QPushButton:pressed { background: #b71c1c; }");
+    blinkButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    
+    // Connect blink button (placeholder for now)
+    connect(blinkButton, &QPushButton::clicked, [this, test, observationInput]() {
+        qDebug() << "🔘 Blink button clicked for test:" << test["title"].toString();
+        qDebug() << "📝 User observation:" << observationInput->text();
+        // TODO: Implement blink functionality
+    });
+    
+    inputLayout->addWidget(blinkButton);
+    testLayout->addLayout(inputLayout);
+    
+    // Add test widget to parent layout
+    parentLayout->addWidget(testWidget);
+    
+    qDebug() << "✅ Self observation test displayed in TestWidget:" << test["title"].toString();
 }

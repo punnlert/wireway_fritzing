@@ -45,6 +45,8 @@ let testGroups = []; // Store test groups for the test window
 let serialPorts = [];
 let blinkboard_serial_port;
 
+const gpt_model = "gpt-4o-mini";
+
 // Helper function to create error responses with line numbers
 function createErrorResponse(error, lineNumber) {
   const errorInfo = lineNumber
@@ -161,14 +163,6 @@ function add_measure_voltage_test({ title, description, jsondata }) {
   console.log("add_measure_voltage_test", title, description, jsondata);
 }
 
-let create_param = {
-  // model: "o4-mini",
-  model: "gpt-4o-mini",
-  input: openai_chat_history,
-  stream: true,
-  tools,
-};
-
 class EventHandler extends EventEmitter {
   openai;
   constructor(openai) {
@@ -203,7 +197,7 @@ class EventHandler extends EventEmitter {
           const set_count = testGroups.length + 1;
           testGroups.push({
             id: Date.now().toString(),
-            name: `Debug ${set_count}`,
+            title: `Debug ${set_count}`,
             description: `Debug ${set_count}`,
             tests: [],
           });
@@ -276,6 +270,14 @@ class EventHandler extends EventEmitter {
         }
       });
     }
+
+    const create_param = {
+      model: gpt_model,
+      input: openai_chat_history,
+      stream: true,
+      tools,
+    };
+
     const response = await this.openai.responses.create(create_param);
 
     for await (const event of response) {
@@ -470,6 +472,15 @@ async function send_openai_message(message) {
 
   // Accumulate the complete response content
   let completeResponse = "";
+
+  const create_param = {
+    model: gpt_model,
+    input: openai_chat_history,
+    stream: true,
+    tools,
+  };
+
+  console.log("create_param", create_param);
 
   const response = await openai.responses.create(create_param);
 
