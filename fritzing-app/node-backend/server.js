@@ -10,6 +10,7 @@ const { ReadlineParser } = require("@serialport/parser-readline");
 const yaml = require("yaml");
 const { spawn } = require("child_process");
 const { SerialPort } = require("serialport");
+const { EventEmitter } = require("events");
 
 const SYSTEM_INSTRUCTION = `You are a teacher assistant in an online interaction prototyping class. The class utilize a tool called "BlinkBoard"; a breadboard with built-in LEDs in each row that can light up to signify to the user which row of the board the instructor is referring to. Each connection hole in the BlinkBoard has a specific coordinate in the form of [row, column]. the coordinate maps to the following schema on the Blinkboard;
 Blinkboard Schematics
@@ -58,13 +59,230 @@ function createErrorResponse(error, lineNumber) {
   };
 }
 
+const tools = [
+  {
+    type: "function",
+    name: "add_self_observe_test",
+    description:
+      "Adding a test that ask the student to describe something about the circuit. For example, if you push X button, does Y light up",
+    parameters: {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        description: { type: "string" },
+      },
+      required: ["title", "description"],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  // {
+  //   type: "function",
+  //   name: "add_measure_voltage_test",
+  //   description:
+  //     "Ask the student to measure voltage at any row on the BlinkBoard. Records the voltage at 500ms interval for 10 seconds. You can describe some of the instruction in the description e.g. rotate the potentionmeter from one end to the other as you measure, bend the flex sensor repeatedly as you measure, etc.",
+  //   parameters: {
+  //     type: "object",
+  //     properties: {
+  //       title: { type: "string" },
+  //       description: {
+  //         type: "string",
+  //         description:
+  //           "this should explain the reason why you administered this test",
+  //       },
+  //       jsondata: {
+  //         type: "object",
+  //         properties: {
+  //           measure_pin: {
+  //             type: "string",
+  //             description:
+  //               "you can decide by yourself which pin to use for measuring. this is the blinkboard built-in adc pins",
+  //             enum: ["A0", "A1", "A2"],
+  //           },
+  //           measure_row: {
+  //             type: "number",
+  //             description: "the row which you want to measure voltage",
+  //             maximum: 50,
+  //             minimum: 1,
+  //           },
+  //         },
+  //         required: ["measure_pin", "measure_row"],
+  //         additionalProperties: false,
+  //       },
+  //     },
+  //     required: ["title", "description", "jsondata"],
+  //     additionalProperties: false,
+  //   },
+  //   strict: true,
+  // },
+];
+
+function add_self_observe_test({ title, description, jsondata }) {
+  console.log("add_self_observe_test", title, description, jsondata);
+
+  // Find the latest test group and add the new test
+  if (testGroups.length > 0) {
+    const latestGroup = testGroups[testGroups.length - 1];
+
+    const newTest = {
+      id: Date.now().toString(),
+      type: "self_observe",
+      title: title,
+      description: description,
+      jsondata: jsondata,
+      timestamp: Date.now(),
+      userObservation: "", // Will store user's observation
+      completed: false,
+    };
+
+    latestGroup.tests.push(newTest);
+
+    console.log(
+      `✅ Added self observation test "${title}" to group "${latestGroup.title}"`
+    );
+
+    // Send the updated test groups to the frontend
+    console.log(
+      JSON.stringify({
+        type: "test_groups_updated",
+        testGroups: testGroups,
+        timestamp: Date.now(),
+      })
+    );
+
+    return newTest.id;
+  } else {
+    console.log("❌ No test groups available to add test to");
+    return null;
+  }
+}
+
+function add_measure_voltage_test({ title, description, jsondata }) {
+  console.log("add_measure_voltage_test", title, description, jsondata);
+}
+
 let create_param = {
-  model: "o4-mini",
-  // model: "gpt-4o-mini",
+  // model: "o4-mini",
+  model: "gpt-4o-mini",
   input: openai_chat_history,
-  // stream: true,
-  // tools,
+  stream: true,
+  tools,
 };
+
+class EventHandler extends EventEmitter {
+  openai;
+  constructor(openai) {
+    super();
+    this.openai = openai;
+  }
+
+  async onEvent(event) {
+    try {
+      // console.log(event);
+      // Retrieve events that are denoted with 'requires_action'
+      // since these will have our tool_calls
+      if (event.type === "response.output_item.added") {
+        const { item } = event;
+      } else if (event.type === "response.completed") {
+        event.response.output.forEach((output) => {
+          if (output.type === "message") {
+            openai_chat_history = [
+              ...openai_chat_history,
+              { role: "assistant", content: output.content[0].text },
+            ];
+          } else {
+            openai_chat_history = [...openai_chat_history, output];
+          }
+        });
+
+        const function_calls = event.response.output.filter(
+          (output) => output.type === "function_call"
+        );
+
+        if (function_calls.length > 0) {
+          const set_count = testGroups.length + 1;
+          testGroups.push({
+            id: Date.now().toString(),
+            name: `Debug ${set_count}`,
+            description: `Debug ${set_count}`,
+            tests: [],
+          });
+          this.handle_function_calls(function_calls);
+        }
+      } else if (event.type === "response.in_progress") {
+        process.stdout.write(
+          JSON.stringify({
+            type: "streaming_start",
+            message: "Starting AI response...",
+            timestamp: Date.now(),
+          }) + "\n"
+        );
+      } else if (event.type === "response.output_text.done") {
+        // TODO: tell the frontend that the output is done
+
+        process.stdout.write(
+          JSON.stringify({
+            type: "streaming_done",
+            message: "AI response complete",
+            timestamp: Date.now(),
+          }) + "\n"
+        );
+        console.log("output is done");
+      } else if (event.type === "response.output_text.delta") {
+        // current_gpt_answer.text += event.delta;
+        // chat_scroll_area?.scrollToBottom();
+        // No longer sending delta events - just accumulate content internally
+      }
+    } catch (error) {
+      console.error("Error handling event:", error);
+    }
+  }
+
+  async handle_function_calls(responses) {
+    if (responses.length > 0) {
+      responses.forEach((response) => {
+        if (response.type === "function_call") {
+          console.log(response);
+          if (response.name === "add_self_observe_test") {
+            const { title, description } = JSON.parse(response.arguments);
+            const jsondata = { field: undefined };
+            const test_key = add_self_observe_test({
+              title,
+              description,
+              jsondata,
+            });
+
+            openai_chat_history.push({
+              type: "function_call_output",
+              call_id: response.call_id,
+              output: JSON.stringify({ test_key, successfully_added: true }),
+            });
+          } else if (response.name === "add_measure_voltage_test") {
+            const { title, description, jsondata } = JSON.parse(
+              response.arguments
+            );
+            const test_key = add_measure_voltage_test({
+              title,
+              description,
+              jsondata,
+            });
+
+            openai_chat_history.push({
+              type: "function_call_output",
+              call_id: response.call_id,
+              output: JSON.stringify({ test_key, successfully_added: true }),
+            });
+          }
+        }
+      });
+    }
+    const response = await this.openai.responses.create(create_param);
+
+    for await (const event of response) {
+      this.emit("event", event);
+    }
+  }
+}
 
 async function update_schematics(netlist) {
   return new Promise((resolve, reject) => {
@@ -218,12 +436,17 @@ function write_json_to_port(json) {
 }
 
 async function send_openai_message(message) {
+  const eventHandler = new EventHandler(openai);
+  eventHandler.on("event", eventHandler.onEvent.bind(eventHandler));
+
   if (openai_chat_history.length == 0) {
     openai_chat_history.push({
       role: "developer",
       content: SYSTEM_INSTRUCTION,
     });
   }
+
+  console.log("schematic_file_change", schematic_file_change);
 
   if (schematic_file_change) {
     const update_schematics = `this is the .yaml representation of the schematics \n ${schematics} \n `;
@@ -232,6 +455,8 @@ async function send_openai_message(message) {
       role: "developer",
       content: update_schematics,
     });
+
+    console.log("update_schematics", update_schematics);
 
     schematic_file_change = false;
   }
@@ -243,8 +468,33 @@ async function send_openai_message(message) {
     content: query_text,
   });
 
+  // Accumulate the complete response content
+  let completeResponse = "";
+
   const response = await openai.responses.create(create_param);
-  return JSON.stringify(response);
+
+  for await (const event of response) {
+    // Accumulate content instead of streaming it
+    if (event.type === "response.output_text.delta") {
+      completeResponse += event.delta;
+    }
+
+    // Also emit to event handler for internal processing
+    eventHandler.emit("event", event);
+  }
+
+  // Send the complete response when streaming is done
+  if (completeResponse.trim()) {
+    console.log(
+      JSON.stringify({
+        type: "chat",
+        message: completeResponse,
+        timestamp: Date.now(),
+      })
+    );
+  }
+
+  return "success";
 }
 
 // Function to detect available serial ports
@@ -506,65 +756,65 @@ process.on("unhandledRejection", (reason, promise) => {
 
 // Initialize with some sample test groups
 testGroups = [
-  {
-    id: "1",
-    title: "Circuit Validation Tests",
-    description:
-      "Basic validation tests for circuit components and connections",
-    tests: [
-      {
-        name: "Component Connection Test",
-        description: "Verify all components are properly connected",
-      },
-      {
-        name: "Power Supply Test",
-        description: "Check power supply connections and voltage levels",
-      },
-      {
-        name: "Signal Flow Test",
-        description: "Validate signal paths through the circuit",
-      },
-    ],
-    timestamp: Date.now(),
-  },
-  {
-    id: "2",
-    title: "Performance Tests",
-    description: "Performance and stress testing for circuit operation",
-    tests: [
-      {
-        name: "Load Testing",
-        description: "Test circuit behavior under various load conditions",
-      },
-      {
-        name: "Temperature Test",
-        description: "Verify circuit stability across temperature ranges",
-      },
-      {
-        name: "Frequency Response",
-        description: "Measure frequency response characteristics",
-      },
-    ],
-    timestamp: Date.now(),
-  },
-  {
-    id: "3",
-    title: "User Interface Tests",
-    description: "Testing the user interface and interaction elements",
-    tests: [
-      {
-        name: "Button Functionality",
-        description: "Test all button interactions and responses",
-      },
-      {
-        name: "Display Accuracy",
-        description: "Verify display shows correct information",
-      },
-      {
-        name: "Error Handling",
-        description: "Test system response to invalid inputs",
-      },
-    ],
-    timestamp: Date.now(),
-  },
+  // {
+  //   id: "1",
+  //   title: "Circuit Validation Tests",
+  //   description:
+  //     "Basic validation tests for circuit components and connections",
+  //   tests: [
+  //     {
+  //       name: "Component Connection Test",
+  //       description: "Verify all components are properly connected",
+  //     },
+  //     {
+  //       name: "Power Supply Test",
+  //       description: "Check power supply connections and voltage levels",
+  //     },
+  //     {
+  //       name: "Signal Flow Test",
+  //       description: "Validate signal paths through the circuit",
+  //     },
+  //   ],
+  //   timestamp: Date.now(),
+  // },
+  // {
+  //   id: "2",
+  //   title: "Performance Tests",
+  //   description: "Performance and stress testing for circuit operation",
+  //   tests: [
+  //     {
+  //       name: "Load Testing",
+  //       description: "Test circuit behavior under various load conditions",
+  //     },
+  //     {
+  //       name: "Temperature Test",
+  //       description: "Verify circuit stability across temperature ranges",
+  //     },
+  //     {
+  //       name: "Frequency Response",
+  //       description: "Measure frequency response characteristics",
+  //     },
+  //   ],
+  //   timestamp: Date.now(),
+  // },
+  // {
+  //   id: "3",
+  //   title: "User Interface Tests",
+  //   description: "Testing the user interface and interaction elements",
+  //   tests: [
+  //     {
+  //       name: "Button Functionality",
+  //       description: "Test all button interactions and responses",
+  //     },
+  //     {
+  //       name: "Display Accuracy",
+  //       description: "Verify display shows correct information",
+  //     },
+  //     {
+  //       name: "Error Handling",
+  //       description: "Test system response to invalid inputs",
+  //     },
+  //   ],
+  //   timestamp: Date.now(),
+  // },
 ];

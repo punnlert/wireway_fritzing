@@ -57,6 +57,10 @@ protected:
   // Status indicator
   QLabel *m_statusIndicator;
   
+  // Loading indicator for AI responses
+  QLabel *m_loadingIndicator;
+  QTimer *m_loadingAnimationTimer;
+  
   // Serial ports
   QJsonArray m_serialPorts;
   
@@ -67,10 +71,24 @@ protected:
   QPushButton *m_updateSchematicsButton;
   QHBoxLayout *m_inputLayout;
   
+  // Test display area
+  QWidget *m_testDisplayArea;
+  QVBoxLayout *m_testLayout;
+  
+  // Loading indicator for AI responses
   void startNodeBackend();
   void sendCommandToNode(const QString &command);
   void addChatMessage(const QString &message, bool isUser = true);
   void updateButtonColor(bool isConnected);
+  
+  // Simple streaming status handling
+  void handleStreamingStart();
+  void handleStreamingDone();
+  
+  // Test handling
+  void handleTestGroupsUpdated(const QJsonArray &testGroups);
+  void displayTests(const QJsonArray &testGroups);
+  void displaySelfObserveTest(const QJsonObject &test);
   
   // Serial port handling
   void handleSerialPortsReceived(const QJsonArray &ports);

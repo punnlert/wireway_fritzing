@@ -70,6 +70,13 @@ BlinkBoardWidget::BlinkBoardWidget(QWidget *parent)
   m_updateSchematicsButton->setStyleSheet("QPushButton { padding: 5px 15px; background: #ececec; color: #323232; border: 1px solid #b1b1b1; border-radius: 0px; font-family: 'Droid Sans'; font-size: 11px; } QPushButton:hover { background: #666666; color: #ffffff; } QPushButton:pressed { background: #f23926; color: #d9d9d9; }");
   m_updateSchematicsButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
 
+  // Setup test display area
+  m_testDisplayArea = new QWidget();
+  m_testLayout = new QVBoxLayout(m_testDisplayArea);
+  m_testLayout->setContentsMargins(0, 0, 0, 0);
+  m_testLayout->setSpacing(10);
+  m_testDisplayArea->setVisible(false); // Hidden by default
+
   // Setup input layout
   m_inputLayout->addWidget(m_messageInput);
   m_inputLayout->addWidget(m_sendButton);
@@ -90,8 +97,16 @@ BlinkBoardWidget::BlinkBoardWidget(QWidget *parent)
   m_statusIndicator->setFixedSize(8, 8);
   m_statusIndicator->setStyleSheet("QLabel { background-color: #f44336; border-radius: 4px; }");
   
+  // Create loading indicator for AI responses
+  m_loadingIndicator = new QLabel();
+  m_loadingIndicator->setFixedSize(8, 8);
+  m_loadingIndicator->setStyleSheet("QLabel { background-color: #9E9E9E; border-radius: 8px; }");
+  m_loadingIndicator->setToolTip("AI response status");
+  m_loadingIndicator->hide(); // Hidden by default
+  
   // Add status indicator and button text to layout
   buttonLayout->addWidget(m_statusIndicator);
+  buttonLayout->addWidget(m_loadingIndicator);
   buttonLayout->addStretch();
   
   // Set the button layout
@@ -122,6 +137,24 @@ BlinkBoardWidget::BlinkBoardWidget(QWidget *parent)
   connect(m_nodeProcess, SIGNAL(finished(int,QProcess::ExitStatus)), 
           this, SLOT(handleNodeFinished(int,QProcess::ExitStatus)));
 
+  // Setup loading animation timer
+  m_loadingAnimationTimer = new QTimer(this);
+  m_loadingAnimationTimer->setInterval(500); // Animate every 500ms
+  connect(m_loadingAnimationTimer, &QTimer::timeout, [this]() {
+    if (m_loadingIndicator->isVisible()) {
+      // Toggle between blue and light blue for loading effect
+      static bool isBright = true;
+      if (isBright) {
+        m_loadingIndicator->setStyleSheet("QLabel { background-color: #2196F3; border-radius: 8px; }");
+      } else {
+        m_loadingIndicator->setStyleSheet("QLabel { background-color: #90CAF9; border-radius: 8px; }");
+      }
+      isBright = !isBright;
+    } else {
+      m_loadingAnimationTimer->stop();
+    }
+  });
+
   // Build the layout directly in main layout (no group box)
   m_mainLayout->setContentsMargins(10, 10, 10, 10);
   m_mainLayout->setSpacing(10); // Add spacing between elements
@@ -129,6 +162,9 @@ BlinkBoardWidget::BlinkBoardWidget(QWidget *parent)
   // Add chat interface at the top
   m_mainLayout->addWidget(m_chatDisplay);
   m_mainLayout->addLayout(m_inputLayout);
+  
+  // Add test display area
+  m_mainLayout->addWidget(m_testDisplayArea);
   
   // Add separator - match Fritzing separator style
   auto separator = new QFrame();
@@ -288,6 +324,21 @@ void BlinkBoardWidget::handleNodeProcessOutput() {
       QJsonObject response = doc.object();
       qDebug() << "✅ Received from Node.js:" << response;
       
+      // Handle streaming status events
+      if (response.contains("type")) {
+        QString type = response["type"].toString();
+        
+        if (type == "streaming_start") {
+          qDebug() << "🚀 Streaming started from backend";
+          handleStreamingStart();
+          continue;
+        } else if (type == "streaming_done") {
+          qDebug() << "✅ Streaming completed from backend";
+          handleStreamingDone();
+          continue;
+        }
+      }
+      
       // Check if this is a chat message response
       if (response.contains("type") && response["type"].toString() == "chat") {
         QString message = response["message"].toString();
@@ -306,6 +357,12 @@ void BlinkBoardWidget::handleNodeProcessOutput() {
       if (response.contains("testGroups")) {
         QJsonArray tests = response["testGroups"].toArray();
         handleTestsReceived(tests);
+      }
+      
+      // Check if this is a test groups update
+      if (response.contains("type") && response["type"].toString() == "test_groups_updated") {
+        QJsonArray tests = response["testGroups"].toArray();
+        handleTestGroupsUpdated(tests);
       }
     } else {
       // Check if it's a raw chat message (non-JSON)
@@ -719,4 +776,127 @@ void BlinkBoardWidget::requestTestsFromBackend() {
   } else {
     qDebug() << "Cannot request tests - Node.js backend not running";
   }
+}
+
+// Simple streaming status handling methods
+void BlinkBoardWidget::handleStreamingStart() {
+  qDebug() << "🚀 AI response generation started - showing loading indicator";
+  
+  // Show the loading indicator
+  m_loadingIndicator->show();
+  m_loadingIndicator->setStyleSheet("QLabel { background-color: #2196F3; border-radius: 8px; }");
+  m_loadingIndicator->setToolTip("AI is generating response...");
+  
+  // Start the loading animation
+  m_loadingAnimationTimer->start();
+  
+  // Add a placeholder message
+  addChatMessage("thinking...", false);
+}
+
+void BlinkBoardWidget::handleStreamingDone() {
+  qDebug() << "✅ AI response generation completed - hiding loading indicator";
+  
+  // Stop the loading animation
+  m_loadingAnimationTimer->stop();
+  
+  // Hide the loading indicator
+  m_loadingIndicator->hide();
+     
+  // Auto-scroll to bottom
+  QTextCursor cursor = m_chatDisplay->textCursor();
+  cursor.movePosition(QTextCursor::End);
+  m_chatDisplay->setTextCursor(cursor);
+}
+
+// Test handling methods
+void BlinkBoardWidget::handleTestGroupsUpdated(const QJsonArray &testGroups) {
+  qDebug() << "🧪 Test groups updated from backend";
+  displayTests(testGroups);
+}
+
+void BlinkBoardWidget::displayTests(const QJsonArray &testGroups) {
+  qDebug() << "🧪 Displaying" << testGroups.size() << "test groups";
+  
+  // Clear previous test display
+  QLayoutItem *item;
+  while ((item = m_testLayout->takeAt(0)) != nullptr) {
+    delete item->widget();
+    delete item;
+  }
+  
+  bool hasTests = false;
+  
+  // Display each test group
+  for (const QJsonValue &groupValue : testGroups) {
+    QJsonObject group = groupValue.toObject();
+    qDebug() << "  Group:" << group["title"].toString();
+    
+    if (group.contains("tests")) {
+      QJsonArray tests = group["tests"].toArray();
+      for (const QJsonValue &testValue : tests) {
+        QJsonObject test = testValue.toObject();
+        qDebug() << "    Test:" << test["title"].toString() << "(" << test["type"].toString() << ")";
+        
+        if (test["type"].toString() == "self_observe") {
+          hasTests = true;
+          displaySelfObserveTest(test);
+        }
+      }
+    }
+  }
+  
+  // Show/hide test display area based on whether there are tests
+  m_testDisplayArea->setVisible(hasTests);
+}
+
+void BlinkBoardWidget::displaySelfObserveTest(const QJsonObject &test) {
+  // Create test container widget
+  QWidget *testWidget = new QWidget();
+  testWidget->setStyleSheet("QWidget { background-color: #f5f5f5; border: 1px solid #ddd; border-radius: 5px; padding: 10px; }");
+  
+  QVBoxLayout *testLayout = new QVBoxLayout(testWidget);
+  testLayout->setSpacing(8);
+  
+  // Test title
+  QLabel *titleLabel = new QLabel(test["title"].toString());
+  titleLabel->setStyleSheet("QLabel { font-family: 'Droid Sans'; font-size: 14px; font-weight: bold; color: #333; }");
+  testLayout->addWidget(titleLabel);
+  
+  // Test description
+  QLabel *descLabel = new QLabel(test["description"].toString());
+  descLabel->setStyleSheet("QLabel { font-family: 'Droid Sans'; font-size: 11px; color: #666; }");
+  descLabel->setWordWrap(true);
+  testLayout->addWidget(descLabel);
+  
+  // Observation input area
+  QHBoxLayout *inputLayout = new QHBoxLayout();
+  inputLayout->setSpacing(10);
+  
+  // Text input for observation
+  QLineEdit *observationInput = new QLineEdit();
+  observationInput->setPlaceholderText("What did you observe?");
+  observationInput->setStyleSheet("QLineEdit { padding: 8px; border: 1px solid #ccc; border-radius: 3px; background: white; font-family: 'Droid Sans'; font-size: 11px; } QLineEdit:focus { border: 1px solid #f23926; }");
+  observationInput->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+  inputLayout->addWidget(observationInput);
+  
+  // Blink button
+  QPushButton *blinkButton = new QPushButton("Blink");
+  blinkButton->setStyleSheet("QPushButton { padding: 8px 16px; background: #f23926; color: white; border: none; border-radius: 3px; font-family: 'Droid Sans'; font-size: 11px; } QPushButton:hover { background: #d32f2f; } QPushButton:pressed { background: #b71c1c; }");
+  blinkButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+  
+  // Connect blink button (placeholder for now)
+  connect(blinkButton, &QPushButton::clicked, [this, test, observationInput]() {
+    qDebug() << "🔘 Blink button clicked for test:" << test["title"].toString();
+    qDebug() << "📝 User observation:" << observationInput->text();
+    // TODO: Implement blink functionality
+  });
+  
+  inputLayout->addWidget(blinkButton);
+  testLayout->addLayout(inputLayout);
+  
+  // Add test widget to main test layout
+  m_testLayout->addWidget(testWidget);
+  
+  qDebug() << "✅ Self observation test displayed:" << test["title"].toString();
 }

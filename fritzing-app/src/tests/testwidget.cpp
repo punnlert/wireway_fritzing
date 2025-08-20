@@ -41,7 +41,7 @@ void TestWidget::setupUI()
     QFrame *separator = new QFrame();
     separator->setFrameShape(QFrame::HLine);
     separator->setFrameShadow(QFrame::Sunken);
-    separator->setStyleSheet("QFrame { background-color:#d9d9d9; border: none; }");
+    separator->setStyleSheet("QFrame { background-color: #d9d9d9; border: none; }");
     m_mainLayout->addWidget(separator);
     
     // Create scroll area for test group cards
