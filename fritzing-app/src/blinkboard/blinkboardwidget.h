@@ -34,6 +34,7 @@ public:
 public slots:
   void handleBlinkBoardConnectionRequest();
   void requestTestsFromBackend();
+  void submitTestResultsToBackend(const QString &groupId, const QJsonObject &results);
 
 signals:
   void testsReceived(const QJsonArray &tests);

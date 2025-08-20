@@ -107,15 +107,36 @@ void TestWidget::onConnectBlinkBoardClicked()
     emit blinkBoardConnectionRequested();
 }
 
-void TestWidget::onSubmitTestResults(const QString &groupId)
+void TestWidget::onSubmitTestResults(const QString &groupId, const QList<QLineEdit*> &testInputs, const QList<QJsonObject> &testData)
 {
-    // Create a simple results object for now
+    // Create the results object with the requested format
     QJsonObject results;
     results["groupId"] = groupId;
     results["timestamp"] = QDateTime::currentDateTime().toString(Qt::ISODate);
     results["status"] = "completed";
     
+    // Gather all test results into the requested JSON format
+    QJsonArray testResultsArray;
+    for (int i = 0; i < testData.size(); ++i) {
+        QJsonObject testResult;
+        testResult["name"] = testData[i]["title"].toString();
+        testResult["description"] = testData[i]["description"].toString();
+        testResult["id"] = testData[i]["id"].toString();
+        
+        // Get the answer from input field if available, otherwise empty string
+        if (i < testInputs.size() && testInputs[i]) {
+            testResult["answer"] = testInputs[i]->text();
+        } else {
+            testResult["answer"] = "";
+        }
+        
+        testResultsArray.append(testResult);
+    }
+    results["testResults"] = testResultsArray;
+    
+    qDebug() << "📝 Submitting test results:" << QJsonDocument(results).toJson();
     emit testResultsSubmitted(groupId, results);
+    emit testResultsSubmittedToBackend(groupId, results);
 }
 
 void TestWidget::clearCards()
@@ -160,6 +181,9 @@ void TestWidget::createTestGroupCard(const QJsonObject &testGroup)
     
     // Tests to be performed (middle section)
     QJsonArray tests = testGroup["tests"].toArray();
+    QList<QLineEdit*> testInputs; // Store references to input fields
+    QList<QJsonObject> testData; // Store test data for submission
+    
     if (!tests.isEmpty()) {
         QLabel *testsLabel = new QLabel("Tests to perform:", card);
         testsLabel->setStyleSheet("QLabel { font-family: 'Droid Sans'; font-size: 11px; font-weight: bold; color: #323232; margin-top: 5px; }");
@@ -171,7 +195,11 @@ void TestWidget::createTestGroupCard(const QJsonObject &testGroup)
             QString testType = test["type"].toString();
 
             if (testType == "self_observe") {
-                createSelfObserveTestDisplay(test, card, cardLayout);
+                QLineEdit* input = createSelfObserveTestDisplay(test, card, cardLayout);
+                if (input) {
+                    testInputs.append(input);
+                    testData.append(test);
+                }
             } else {
                 // Minimal display for other test types
                 QString testName = test["name"].toString();
@@ -181,6 +209,9 @@ void TestWidget::createTestGroupCard(const QJsonObject &testGroup)
                 QLabel *testLabel = new QLabel(testName, card);
                 testLabel->setStyleSheet("QLabel { font-family: 'Droid Sans'; font-size: 10px; color: #666666; margin-left: 15px; }");
                 cardLayout->addWidget(testLabel);
+                
+                // Store test data for submission
+                testData.append(test);
             }
         }
     }
@@ -190,9 +221,9 @@ void TestWidget::createTestGroupCard(const QJsonObject &testGroup)
     QPushButton *submitButton = new QPushButton("Submit Test Results", card);
     submitButton->setStyleSheet("QPushButton { padding: 8px 16px; background: #ececec; color: #323232; border: 1px solid #b1b1b1; border-radius: 0px; font-family: 'Droid Sans'; font-size: 11px; margin-top: 10px; } QPushButton:hover { background: #666666; color: #ffffff; } QPushButton:pressed { background: #f23926; color: #d9d9d9; }");
     
-    // Connect submit button to the group ID
-    connect(submitButton, &QPushButton::clicked, [this, groupId]() {
-        this->onSubmitTestResults(groupId);
+    // Connect submit button to gather all test data
+    connect(submitButton, &QPushButton::clicked, [this, groupId, testInputs, testData]() {
+        this->onSubmitTestResults(groupId, testInputs, testData);
     });
    
     
@@ -235,7 +266,7 @@ void TestWidget::requestTestsFromBackend()
     emit testsRequested();
 }
 
-void TestWidget::createSelfObserveTestDisplay(const QJsonObject &test, QWidget *parent, QVBoxLayout *parentLayout)
+QLineEdit* TestWidget::createSelfObserveTestDisplay(const QJsonObject &test, QWidget *parent, QVBoxLayout *parentLayout)
 {
     // Create test container widget
     QFrame *testWidget = new QFrame(parent);
@@ -286,4 +317,5 @@ void TestWidget::createSelfObserveTestDisplay(const QJsonObject &test, QWidget *
     parentLayout->addWidget(testWidget);
     
     qDebug() << "✅ Self observation test displayed in TestWidget:" << test["title"].toString();
+    return observationInput; // Return the input field
 }

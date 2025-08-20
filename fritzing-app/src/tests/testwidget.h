@@ -11,6 +11,7 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QLineEdit>
 
 class TestWidget : public QWidget
 {
@@ -29,12 +30,13 @@ public slots:
 
 private slots:
     void onConnectBlinkBoardClicked();
-    void onSubmitTestResults(const QString &groupId);
+    void onSubmitTestResults(const QString &groupId, const QList<QLineEdit*> &testInputs, const QList<QJsonObject> &testData);
     void onConnectBackendClicked();
     void onRefreshTestsClicked();
 
 signals:
     void testResultsSubmitted(const QString &groupId, const QJsonObject &results);
+    void testResultsSubmittedToBackend(const QString &groupId, const QJsonObject &results);
     void testGroupsRequested();
     void blinkBoardConnectionRequested();
     void testsRequested();
@@ -43,7 +45,7 @@ private:
     void setupUI();
     void setupConnections();
     void createTestGroupCard(const QJsonObject &testGroup);
-    void createSelfObserveTestDisplay(const QJsonObject &test, QWidget *parent, QVBoxLayout *parentLayout);
+    QLineEdit* createSelfObserveTestDisplay(const QJsonObject &test, QWidget *parent, QVBoxLayout *parentLayout);
     void clearCards();
     
     // Backend handling

@@ -257,6 +257,10 @@ void MainWindow::initDock() {
   connect(m_blinkboardWidget, &BlinkBoardWidget::testGroupsUpdated, 
           m_testWidget, &TestWidget::handleTestGroupsUpdated);
 
+  // Connect TestWidget's test results submission signal to BlinkBoardWidget's backend submission method
+  connect(m_testWidget, &TestWidget::testResultsSubmittedToBackend, 
+          m_blinkboardWidget, &BlinkBoardWidget::submitTestResultsToBackend);
+
   // DebugDialog::debug("after creating bins");
   if (m_fileProgressDialog) {
     m_fileProgressDialog->setValue(89);

@@ -46,6 +46,7 @@ let serialPorts = [];
 let blinkboard_serial_port;
 
 const gpt_model = "gpt-4o-mini";
+// const gpt_model = "o4-mini";
 
 // Helper function to create error responses with line numbers
 function createErrorResponse(error, lineNumber) {
@@ -72,52 +73,67 @@ const tools = [
       properties: {
         title: { type: "string" },
         description: { type: "string" },
+        jsondata: {
+          type: "object",
+          properties: {
+            pin: {
+              type: "array",
+              items: { type: "number", maximum: 50, minimum: 1 },
+              description:
+                "pins that you want to blink to better support your message",
+            },
+          },
+        },
       },
       required: ["title", "description"],
       additionalProperties: false,
     },
     strict: true,
   },
-  // {
-  //   type: "function",
-  //   name: "add_measure_voltage_test",
-  //   description:
-  //     "Ask the student to measure voltage at any row on the BlinkBoard. Records the voltage at 500ms interval for 10 seconds. You can describe some of the instruction in the description e.g. rotate the potentionmeter from one end to the other as you measure, bend the flex sensor repeatedly as you measure, etc.",
-  //   parameters: {
-  //     type: "object",
-  //     properties: {
-  //       title: { type: "string" },
-  //       description: {
-  //         type: "string",
-  //         description:
-  //           "this should explain the reason why you administered this test",
-  //       },
-  //       jsondata: {
-  //         type: "object",
-  //         properties: {
-  //           measure_pin: {
-  //             type: "string",
-  //             description:
-  //               "you can decide by yourself which pin to use for measuring. this is the blinkboard built-in adc pins",
-  //             enum: ["A0", "A1", "A2"],
-  //           },
-  //           measure_row: {
-  //             type: "number",
-  //             description: "the row which you want to measure voltage",
-  //             maximum: 50,
-  //             minimum: 1,
-  //           },
-  //         },
-  //         required: ["measure_pin", "measure_row"],
-  //         additionalProperties: false,
-  //       },
-  //     },
-  //     required: ["title", "description", "jsondata"],
-  //     additionalProperties: false,
-  //   },
-  //   strict: true,
-  // },
+  {
+    type: "function",
+    name: "add_measure_voltage_test",
+    description:
+      "Ask the student to measure voltage at any row on the BlinkBoard. Records the voltage at 500ms interval for 10 seconds. You can describe some of the instruction in the description e.g. rotate the potentionmeter from one end to the other as you measure, bend the flex sensor repeatedly as you measure, etc.",
+    parameters: {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        description: {
+          type: "string",
+          description:
+            "this should explain the reason why you administered this test",
+        },
+        jsondata: {
+          type: "object",
+          properties: {
+            measure_pin: {
+              type: "string",
+              description:
+                "you can decide by yourself which pin to use for measuring. this is the blinkboard built-in adc pins",
+              enum: ["A0", "A1", "A2"],
+            },
+            measure_row: {
+              type: "number",
+              description: "the row which you want to measure voltage",
+              maximum: 50,
+              minimum: 1,
+            },
+          },
+          required: ["measure_pin", "measure_row"],
+          additionalProperties: false,
+        },
+      },
+      required: ["title", "description", "jsondata"],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
 ];
+
+function add_measure_voltage_test({ title, description, jsondata }) {
+  console.log("add_measure_voltage_test", title, description, jsondata);
+}
 
 function add_self_observe_test({ title, description, jsondata }) {
   console.log("add_self_observe_test", title, description, jsondata);
@@ -221,6 +237,14 @@ class EventHandler extends EventEmitter {
         }
       } else if (event.type === "response.output_text.done") {
         // TODO: tell the frontend that the output is done
+
+        process.stdout.write(
+          JSON.stringify({
+            type: "chat",
+            message: event.text,
+            timestamp: Date.now(),
+          }) + "\n"
+        );
 
         process.stdout.write(
           JSON.stringify({
@@ -494,24 +518,24 @@ async function send_openai_message(message) {
 
   for await (const event of response) {
     // Accumulate content instead of streaming it
-    if (event.type === "response.output_text.delta") {
-      completeResponse += event.delta;
-    }
+    // if (event.type === "response.output_text.delta") {
+    //   completeResponse += event.delta;
+    // }
 
     // Also emit to event handler for internal processing
     eventHandler.emit("event", event);
   }
 
   // Send the complete response when streaming is done
-  if (completeResponse.trim()) {
-    console.log(
-      JSON.stringify({
-        type: "chat",
-        message: completeResponse,
-        timestamp: Date.now(),
-      })
-    );
-  }
+  // if (completeResponse.trim()) {
+  //   console.log(
+  //     JSON.stringify({
+  //       type: "chat",
+  //       message: completeResponse,
+  //       timestamp: Date.now(),
+  //     })
+  //   );
+  // }
 
   return "success";
 }
@@ -648,10 +672,45 @@ async function processCommand(command) {
       // Return all stored test groups for display in Qt frontend
       return {
         status: "success",
-        message: "Test groups retrieved successfully",
         testGroups: testGroups,
         timestamp: Date.now(),
       };
+
+    case "submit_test_results":
+      try {
+        const { groupId, results } = command;
+        console.log(`📝 Received test results for group ${groupId}:`, results);
+
+        // Store the test results (you can modify this to save to file/database)
+        // For now, just log them
+        // console.log("Test Results Summary:");
+        // if (results.testResults && Array.isArray(results.testResults)) {
+        //   results.testResults.forEach((testResult, index) => {
+        //     console.log(`  Test ${index + 1}:`);
+        //     console.log(`    Name: ${testResult.name}`);
+        //     console.log(`    Description: ${testResult.description}`);
+        //     console.log(`    ID: ${testResult.id}`);
+        //     console.log(`    Answer: ${testResult.answer}`);
+        //     console.log("");
+        //   });
+        // }
+
+        const message = `this is the test results that we have run. \n ${JSON.stringify(
+          results
+        )} \n 
+        please analyze the test results and provide a summary of the test results.
+        `;
+        await send_openai_message(message);
+
+        return {
+          status: "success",
+          message: `Test results for group ${groupId} received successfully`,
+          timestamp: Date.now(),
+          resultsReceived: results,
+        };
+      } catch (error) {
+        return createErrorResponse(error, 650); // Line number for submit_test_results
+      }
 
     case "add_test_group":
       // Add a new test group to the collection
@@ -673,25 +732,6 @@ async function processCommand(command) {
         return createErrorResponse(
           new Error("No test group data provided"),
           365
-        );
-      }
-
-    case "submit_test_results":
-      // Handle test results submission
-      const { groupId, results } = command;
-      if (groupId && results) {
-        console.log(`Test results submitted for group ${groupId}:`, results);
-        return {
-          status: "success",
-          message: "Test results submitted successfully",
-          groupId: groupId,
-          results: results,
-          timestamp: Date.now(),
-        };
-      } else {
-        return createErrorResponse(
-          new Error("Missing group ID or results data"),
-          385
         );
       }
 
@@ -745,6 +785,7 @@ async function processCommand(command) {
         //   message: `${response}`,
         //   timestamp: Date.now(),
         // };
+        return;
       }
 
       return createErrorResponse(new Error(`Unknown command: ${cmd}`), 435);
@@ -775,65 +816,65 @@ process.on("unhandledRejection", (reason, promise) => {
 
 // Initialize with some sample test groups
 testGroups = [
-  {
-    id: "1",
-    title: "Circuit Validation Tests",
-    description:
-      "Basic validation tests for circuit components and connections",
-    tests: [
-      {
-        name: "Component Connection Test",
-        description: "Verify all components are properly connected",
-      },
-      {
-        name: "Power Supply Test",
-        description: "Check power supply connections and voltage levels",
-      },
-      {
-        name: "Signal Flow Test",
-        description: "Validate signal paths through the circuit",
-      },
-    ],
-    timestamp: Date.now(),
-  },
-  {
-    id: "2",
-    title: "Performance Tests",
-    description: "Performance and stress testing for circuit operation",
-    tests: [
-      {
-        name: "Load Testing",
-        description: "Test circuit behavior under various load conditions",
-      },
-      {
-        name: "Temperature Test",
-        description: "Verify circuit stability across temperature ranges",
-      },
-      {
-        name: "Frequency Response",
-        description: "Measure frequency response characteristics",
-      },
-    ],
-    timestamp: Date.now(),
-  },
-  {
-    id: "3",
-    title: "User Interface Tests",
-    description: "Testing the user interface and interaction elements",
-    tests: [
-      {
-        name: "Button Functionality",
-        description: "Test all button interactions and responses",
-      },
-      {
-        name: "Display Accuracy",
-        description: "Verify display shows correct information",
-      },
-      {
-        name: "Error Handling",
-        description: "Test system response to invalid inputs",
-      },
-    ],
-    timestamp: Date.now(),
-  },
+  // {
+  //   id: "1",
+  //   title: "Circuit Validation Tests",
+  //   description:
+  //     "Basic validation tests for circuit components and connections",
+  //   tests: [
+  //     {
+  //       name: "Component Connection Test",
+  //       description: "Verify all components are properly connected",
+  //     },
+  //     {
+  //       name: "Power Supply Test",
+  //       description: "Check power supply connections and voltage levels",
+  //     },
+  //     {
+  //       name: "Signal Flow Test",
+  //       description: "Validate signal paths through the circuit",
+  //     },
+  //   ],
+  //   timestamp: Date.now(),
+  // },
+  // {
+  //   id: "2",
+  //   title: "Performance Tests",
+  //   description: "Performance and stress testing for circuit operation",
+  //   tests: [
+  //     {
+  //       name: "Load Testing",
+  //       description: "Test circuit behavior under various load conditions",
+  //     },
+  //     {
+  //       name: "Temperature Test",
+  //       description: "Verify circuit stability across temperature ranges",
+  //     },
+  //     {
+  //       name: "Frequency Response",
+  //       description: "Measure frequency response characteristics",
+  //     },
+  //   ],
+  //   timestamp: Date.now(),
+  // },
+  // {
+  //   id: "3",
+  //   title: "User Interface Tests",
+  //   description: "Testing the user interface and interaction elements",
+  //   tests: [
+  //     {
+  //       name: "Button Functionality",
+  //       description: "Test all button interactions and responses",
+  //     },
+  //     {
+  //       name: "Display Accuracy",
+  //       description: "Verify display shows correct information",
+  //     },
+  //     {
+  //       name: "Error Handling",
+  //       description: "Test system response to invalid inputs",
+  //     },
+  //   ],
+  //   timestamp: Date.now(),
+  // },
 ];

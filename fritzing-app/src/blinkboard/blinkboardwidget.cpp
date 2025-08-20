@@ -814,3 +814,26 @@ void BlinkBoardWidget::handleStreamingDone() {
   cursor.movePosition(QTextCursor::End);
   m_chatDisplay->setTextCursor(cursor);
 }
+
+void BlinkBoardWidget::submitTestResultsToBackend(const QString &groupId, const QJsonObject &results)
+{
+  if (m_nodeProcess->state() != QProcess::Running) {
+    addChatMessage("Not connected to backend. Cannot submit test results.", false);
+    return;
+  }
+
+  // Create command to send test results to backend
+  QJsonObject jsonCommand;
+  jsonCommand["command"] = "submit_test_results";
+  jsonCommand["groupId"] = groupId;
+  jsonCommand["results"] = results;
+  jsonCommand["timestamp"] = QDateTime::currentMSecsSinceEpoch();
+  
+  QJsonDocument doc(jsonCommand);
+  QString jsonString = doc.toJson(QJsonDocument::Compact);
+  
+  qDebug() << "📝 Sending test results to Node.js backend:" << jsonString.left(200) + "...";
+  m_nodeProcess->write(jsonString.toUtf8() + "\n");
+  
+  addChatMessage("submitted tests results for group " + groupId, false);
+}
