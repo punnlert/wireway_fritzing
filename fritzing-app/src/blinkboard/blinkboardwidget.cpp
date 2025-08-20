@@ -437,13 +437,17 @@ void BlinkBoardWidget::addChatMessage(const QString &message, bool isUser) {
   QString timestamp = QDateTime::currentDateTime().toString("hh:mm:ss");
   QString formattedMessage;
   
+  // First escape HTML characters, then convert newlines to <br> tags
+  QString escapedMessage = message.toHtmlEscaped();
+  escapedMessage.replace('\n', "<br>");
+  
   if (isUser) {
     formattedMessage = QString("<div style='text-align: right; margin: 5px;'><span style='background-color: #821f09; color: white; padding: 5px 10px; border-radius: 0px; display: inline-block; font-family: Droid Sans; font-size: 11px;'>%1</span><br><small style='color: #777777; font-family: Droid Sans; font-size: 9px;'>%2</small></div>")
-                      .arg(message.toHtmlEscaped())
+                      .arg(escapedMessage)
                       .arg(timestamp);
   } else {
     formattedMessage = QString("<div style='margin: 5px;'><span style='background-color: #ececec; color: #323232; padding: 5px 10px; border-radius: 0px; display: inline-block; border: 1px solid #b1b1b1; font-family: Droid Sans; font-size: 11px;'>%1</span><br><small style='color: #777777; font-family: Droid Sans; font-size: 9px;'>%2</small></div>")
-                      .arg(message.toHtmlEscaped())
+                      .arg(escapedMessage)
                       .arg(timestamp);
   }
   

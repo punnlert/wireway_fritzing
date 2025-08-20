@@ -137,7 +137,7 @@ void TestWidget::createTestGroupCard(const QJsonObject &testGroup)
     
     QVBoxLayout *cardLayout = new QVBoxLayout(card);
     cardLayout->setContentsMargins(15, 15, 15, 15);
-    cardLayout->setSpacing(10);
+    cardLayout->setSpacing(2);
     
     // Group title and description (top section)
     QString groupTitle = testGroup["title"].toString();
@@ -152,11 +152,37 @@ void TestWidget::createTestGroupCard(const QJsonObject &testGroup)
     QLabel *descLabel = new QLabel(groupDescription, card);
     descLabel->setStyleSheet("QLabel { font-family: 'Droid Sans'; font-size: 11px; color: #666666; }");
     descLabel->setWordWrap(true);
+
+     
+    // Add all elements to card layout
+    cardLayout->addWidget(titleLabel);
+    cardLayout->addWidget(descLabel);
     
     // Tests to be performed (middle section)
     QJsonArray tests = testGroup["tests"].toArray();
     if (!tests.isEmpty()) {
-        // Tests will be handled in the tests section below
+        QLabel *testsLabel = new QLabel("Tests to perform:", card);
+        testsLabel->setStyleSheet("QLabel { font-family: 'Droid Sans'; font-size: 11px; font-weight: bold; color: #323232; margin-top: 5px; }");
+        cardLayout->addWidget(testsLabel);
+
+        // Add each test directly to the card layout (no extra frame)
+        for (const QJsonValue &testValue : tests) {
+            QJsonObject test = testValue.toObject();
+            QString testType = test["type"].toString();
+
+            if (testType == "self_observe") {
+                createSelfObserveTestDisplay(test, card, cardLayout);
+            } else {
+                // Minimal display for other test types
+                QString testName = test["name"].toString();
+                if (testName.isEmpty()) testName = test["title"].toString();
+                if (testName.isEmpty()) testName = "Untitled Test";
+
+                QLabel *testLabel = new QLabel(testName, card);
+                testLabel->setStyleSheet("QLabel { font-family: 'Droid Sans'; font-size: 10px; color: #666666; margin-left: 15px; }");
+                cardLayout->addWidget(testLabel);
+            }
+        }
     }
     
     // Submit button (bottom section)
@@ -168,60 +194,7 @@ void TestWidget::createTestGroupCard(const QJsonObject &testGroup)
     connect(submitButton, &QPushButton::clicked, [this, groupId]() {
         this->onSubmitTestResults(groupId);
     });
-    
-    // Add all elements to card layout
-    cardLayout->addWidget(titleLabel);
-    cardLayout->addWidget(descLabel);
-    
-    if (!tests.isEmpty()) {
-        QLabel *testsLabel = new QLabel("Tests to perform:", card);
-        testsLabel->setStyleSheet("QLabel { font-family: 'Droid Sans'; font-size: 11px; font-weight: bold; color: #323232; margin-top: 5px; }");
-        cardLayout->addWidget(testsLabel);
-        
-        // Add tests section
-        QFrame *testsSection = new QFrame(card);
-        testsSection->setStyleSheet("QFrame { background-color: #f8f8f8; border: none; border-radius: 3px; padding: 10px; margin: 5px 0px; }");
-        QVBoxLayout *testsSectionLayout = new QVBoxLayout(testsSection);
-        testsSectionLayout->setContentsMargins(10, 10, 10, 10);
-        testsSectionLayout->setSpacing(8);
-        
-        // Add each test to the tests section
-        for (const QJsonValue &testValue : tests) {
-            QJsonObject test = testValue.toObject();
-            QString testType = test["type"].toString();
-            
-            if (testType == "self_observe") {
-                // Create self observation test display
-                createSelfObserveTestDisplay(test, testsSection, testsSectionLayout);
-            } else {
-                // Handle other test types (legacy support)
-                QString testName = test["name"].toString();
-                QString testDesc = test["description"].toString();
-                
-                QFrame *testItem = new QFrame(testsSection);
-                testItem->setStyleSheet("QFrame { background-color: #ececec; border: 1px solid #d0d0d0; border-radius: 0px; padding: 8px; margin: 2px; }");
-                
-                QVBoxLayout *testLayout = new QVBoxLayout(testItem);
-                testLayout->setContentsMargins(8, 8, 8, 8);
-                testLayout->setSpacing(4);
-                
-                QLabel *testNameLabel = new QLabel(testName, testItem);
-                testNameLabel->setStyleSheet("QLabel { font-family: 'Droid Sans'; font-size: 11px; font-weight: bold; color: #323232; }");
-                
-                if (!testDesc.isEmpty()) {
-                    QLabel *testDescLabel = new QLabel(testDesc, testItem);
-                    testDescLabel->setStyleSheet("QLabel { font-family: 'Droid Sans'; font-size: 10px; color: #666666; }");
-                    testDescLabel->setWordWrap(true);
-                    testLayout->addWidget(testDescLabel);
-                }
-                
-                testLayout->addWidget(testNameLabel);
-                testsSectionLayout->addWidget(testItem);
-            }
-        }
-        
-        cardLayout->addWidget(testsSection);
-    }
+   
     
     cardLayout->addWidget(submitButton);
     
@@ -266,11 +239,11 @@ void TestWidget::createSelfObserveTestDisplay(const QJsonObject &test, QWidget *
 {
     // Create test container widget
     QFrame *testWidget = new QFrame(parent);
-    testWidget->setStyleSheet("QFrame { background-color: #f5f5f5; border: 1px solid #ddd; border-radius: 5px; padding: 10px; margin: 5px; }");
+    testWidget->setStyleSheet("QFrame { background-color: #d6d6d6; padding: 5px; margin: 5px; }");
     
     QVBoxLayout *testLayout = new QVBoxLayout(testWidget);
     testLayout->setContentsMargins(10, 10, 10, 10);
-    testLayout->setSpacing(8);
+    testLayout->setSpacing(2);
     
     // Test title
     QLabel *titleLabel = new QLabel(test["title"].toString());

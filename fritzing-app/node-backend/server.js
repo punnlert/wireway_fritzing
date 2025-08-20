@@ -767,65 +767,65 @@ process.on("unhandledRejection", (reason, promise) => {
 
 // Initialize with some sample test groups
 testGroups = [
-  // {
-  //   id: "1",
-  //   title: "Circuit Validation Tests",
-  //   description:
-  //     "Basic validation tests for circuit components and connections",
-  //   tests: [
-  //     {
-  //       name: "Component Connection Test",
-  //       description: "Verify all components are properly connected",
-  //     },
-  //     {
-  //       name: "Power Supply Test",
-  //       description: "Check power supply connections and voltage levels",
-  //     },
-  //     {
-  //       name: "Signal Flow Test",
-  //       description: "Validate signal paths through the circuit",
-  //     },
-  //   ],
-  //   timestamp: Date.now(),
-  // },
-  // {
-  //   id: "2",
-  //   title: "Performance Tests",
-  //   description: "Performance and stress testing for circuit operation",
-  //   tests: [
-  //     {
-  //       name: "Load Testing",
-  //       description: "Test circuit behavior under various load conditions",
-  //     },
-  //     {
-  //       name: "Temperature Test",
-  //       description: "Verify circuit stability across temperature ranges",
-  //     },
-  //     {
-  //       name: "Frequency Response",
-  //       description: "Measure frequency response characteristics",
-  //     },
-  //   ],
-  //   timestamp: Date.now(),
-  // },
-  // {
-  //   id: "3",
-  //   title: "User Interface Tests",
-  //   description: "Testing the user interface and interaction elements",
-  //   tests: [
-  //     {
-  //       name: "Button Functionality",
-  //       description: "Test all button interactions and responses",
-  //     },
-  //     {
-  //       name: "Display Accuracy",
-  //       description: "Verify display shows correct information",
-  //     },
-  //     {
-  //       name: "Error Handling",
-  //       description: "Test system response to invalid inputs",
-  //     },
-  //   ],
-  //   timestamp: Date.now(),
-  // },
+  {
+    id: "1",
+    title: "Circuit Validation Tests",
+    description:
+      "Basic validation tests for circuit components and connections",
+    tests: [
+      {
+        name: "Component Connection Test",
+        description: "Verify all components are properly connected",
+      },
+      {
+        name: "Power Supply Test",
+        description: "Check power supply connections and voltage levels",
+      },
+      {
+        name: "Signal Flow Test",
+        description: "Validate signal paths through the circuit",
+      },
+    ],
+    timestamp: Date.now(),
+  },
+  {
+    id: "2",
+    title: "Performance Tests",
+    description: "Performance and stress testing for circuit operation",
+    tests: [
+      {
+        name: "Load Testing",
+        description: "Test circuit behavior under various load conditions",
+      },
+      {
+        name: "Temperature Test",
+        description: "Verify circuit stability across temperature ranges",
+      },
+      {
+        name: "Frequency Response",
+        description: "Measure frequency response characteristics",
+      },
+    ],
+    timestamp: Date.now(),
+  },
+  {
+    id: "3",
+    title: "User Interface Tests",
+    description: "Testing the user interface and interaction elements",
+    tests: [
+      {
+        name: "Button Functionality",
+        description: "Test all button interactions and responses",
+      },
+      {
+        name: "Display Accuracy",
+        description: "Verify display shows correct information",
+      },
+      {
+        name: "Error Handling",
+        description: "Test system response to invalid inputs",
+      },
+    ],
+    timestamp: Date.now(),
+  },
 ];
