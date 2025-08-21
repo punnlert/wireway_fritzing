@@ -565,8 +565,8 @@ void TestWidget::createSwitchConnectionSuggestionTestDisplay(const QJsonObject &
     testLayout->addWidget(descLabel);
     
     // Middle section - connection suggestion text
-    QString pinFrom = QString::number(test["pin_from"].toDouble());
-    QString pinTo = QString::number(test["pin_to"].toDouble());
+    QString pinFrom = test["pin_from"].toString();
+    QString pinTo = test["pin_to"].toString();
     
     // Debug: Print the test data to see what's available
     qDebug() << "🔌 Switch connection test data:" << test;

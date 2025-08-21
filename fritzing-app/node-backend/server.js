@@ -27,10 +27,13 @@ Blinkboard Schematics
 where [51, 1] is the positive rail and [52, 1] is a negative rail. The number for the positive and negative rails are just for annotations in the code representation of the circuit, you should only call them positive and negative rail and you should NOT call them by their number. The same row of the breadboard is connected.
 So, instead of saying [51, 1] and [52, 1], you should say "positive rail" and "negative rail".
 
+
 the blinkboard also has a built-in analog and digital I/O pins that can be used to your advantage.
 - pins A0, A1, A2 can be used to sensing voltage at various point in the circuit in relative to ground.
 
 Your job is to help the student debug the circuit using your understanding of the circuit
+
+If the student is simply making a miswiring mistake, you should just suggest them to fix it. Only add tests if you have suspision about something. Don't add extensive tests. ONLY ADD THEM WHEN YOU FEEL NECESSARY.
 `;
 
 const openai = new OpenAI({
@@ -46,8 +49,9 @@ let testGroups = []; // Store test groups for the test window
 let serialPorts = [];
 let blinkboard_serial_port;
 
-const gpt_model = "gpt-4o-mini";
-// const gpt_model = "o4-mini";
+// const gpt_model = "gpt-4o-mini";
+const gpt_model = "o4-mini";
+const gpt_reasoning = { effort: "low" };
 
 // Helper function to create error responses with line numbers
 function createErrorResponse(error, lineNumber) {
@@ -94,16 +98,132 @@ const tools = [
           type: "object",
           properties: {
             pin_from: {
-              type: "number",
-              maximum: 50,
-              minimum: 1,
+              type: "string",
+              enum: [
+                "1",
+                "2",
+                "3",
+                "4",
+                "5",
+                "6",
+                "7",
+                "8",
+                "9",
+                "10",
+                "11",
+                "12",
+                "13",
+                "14",
+                "15",
+                "16",
+                "17",
+                "18",
+                "19",
+                "20",
+                "21",
+                "22",
+                "23",
+                "24",
+                "25",
+                "26",
+                "27",
+                "28",
+                "29",
+                "30",
+                "31",
+                "32",
+                "33",
+                "34",
+                "35",
+                "36",
+                "37",
+                "38",
+                "39",
+                "40",
+                "41",
+                "42",
+                "43",
+                "44",
+                "45",
+                "46",
+                "47",
+                "48",
+                "49",
+                "50",
+                "a0",
+                "a1",
+                "a2",
+                "d0",
+                "d1",
+                "d2",
+                "vcc",
+                "gnd",
+              ],
               description: "the pin that the student mistakenly connected",
             },
             pin_to: {
-              type: "number",
-              maximum: 50,
-              minimum: 1,
+              type: "string",
               description: "the pin that the student should connect to",
+              enum: [
+                "1",
+                "2",
+                "3",
+                "4",
+                "5",
+                "6",
+                "7",
+                "8",
+                "9",
+                "10",
+                "11",
+                "12",
+                "13",
+                "14",
+                "15",
+                "16",
+                "17",
+                "18",
+                "19",
+                "20",
+                "21",
+                "22",
+                "23",
+                "24",
+                "25",
+                "26",
+                "27",
+                "28",
+                "29",
+                "30",
+                "31",
+                "32",
+                "33",
+                "34",
+                "35",
+                "36",
+                "37",
+                "38",
+                "39",
+                "40",
+                "41",
+                "42",
+                "43",
+                "44",
+                "45",
+                "46",
+                "47",
+                "48",
+                "49",
+                "50",
+                "a0",
+                "a1",
+                "a2",
+                "d0",
+                "d1",
+                "d2",
+                "vcc",
+                "gnd",
+              ],
             },
           },
           required: ["pin_from", "pin_to"],
@@ -262,8 +382,8 @@ function add_switch_connection_suggestion({ title, description, jsondata }) {
       title: title,
       description: description,
       jsondata: jsondata || {},
-      pin_from: jsondata?.pin_from || 1,
-      pin_to: jsondata?.pin_to || 1,
+      pin_from: jsondata?.pin_from || "",
+      pin_to: jsondata?.pin_to || "",
       completed: false,
     };
 
@@ -430,6 +550,7 @@ class EventHandler extends EventEmitter {
       input: openai_chat_history,
       stream: true,
       tools,
+      reasoning: gpt_reasoning,
     };
 
     const response = await this.openai.responses.create(create_param);
@@ -679,11 +800,9 @@ async function send_openai_message(message) {
     schematic_file_change = false;
   }
 
-  let query_text = `${message} \n Add any test if necessary. You can explain the test in your reply but you don't have to mention some trivial details like test_key`;
-
   openai_chat_history.push({
     role: "user",
-    content: query_text,
+    content: message,
   });
 
   // Accumulate the complete response content
@@ -694,6 +813,7 @@ async function send_openai_message(message) {
     input: openai_chat_history,
     stream: true,
     tools,
+    reasoning: gpt_reasoning,
   };
 
   // console.log("create_param", create_param);
@@ -872,7 +992,7 @@ async function processCommand(command) {
         )} \n 
         please analyze the test results and provide a summary of the test results.
         `;
-        // await send_openai_message(message);
+        await send_openai_message(message);
 
         return {
           status: "success",
@@ -897,8 +1017,21 @@ async function processCommand(command) {
           blink_command_pin(test.jsondata.measure_pin, "blink");
           blink_row(test.jsondata.measure_row, "blink");
         } else if (test.type === "switch_connection_suggestion") {
-          blink_row(test.jsondata.pin_from, "on");
-          blink_row(test.jsondata.pin_to, "blink2");
+          // INSERT_YOUR_CODE
+          // Determine if pin_from is a number (row) or a command pin (like 'a0', 'd1', etc.)
+          if (!isNaN(Number(test.jsondata.pin_from))) {
+            blink_row(Number(test.jsondata.pin_from), "on");
+          } else {
+            blink_command_pin(test.jsondata.pin_from, "on");
+          }
+
+          if (!isNaN(Number(test.jsondata.pin_to))) {
+            blink_row(Number(test.jsondata.pin_to), "blink2");
+          } else {
+            blink_command_pin(test.jsondata.pin_to, "blink2");
+          }
+          // blink_row(test.jsondata.pin_from, "on");
+          // blink_row(test.jsondata.pin_to, "blink2");
         }
 
         setTimeout(() => {
@@ -997,7 +1130,8 @@ async function processCommand(command) {
         const message = cmd.substring(5); // Remove "chat:" prefix
         console.log(`Chat message received: ${message}`);
 
-        const response = await send_openai_message(message);
+        let query_text = `${message} \n Add any tests or suggestions if necessary. You can explain the test in your reply but you don't have to mention some trivial details like test_key`;
+        const response = await send_openai_message(query_text);
         // // Echo the message back (you can add more sophisticated chat logic here)
         // return {
         //   type: "chat",
@@ -1081,9 +1215,9 @@ testGroups = [
         title: "Switch connection suggestion",
         description:
           "The student mistakenly connected pin 10 to pin 11. You should switch the connection to pin 12.",
-        jsondata: { pin_from: 10, pin_to: 11 },
-        pin_from: 10,
-        pin_to: 11,
+        jsondata: { pin_from: "10", pin_to: "gnd" },
+        pin_from: "10",
+        pin_to: "gnd",
         userObservation: "",
         completed: false,
       },
