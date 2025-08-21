@@ -112,13 +112,13 @@ fn generate_net_pin(element: &Element, connections: &mut Vec<Pin>) {
                                 let pin = Pin::new(row + 25);
                                 connected_pin.insert(pin);
                             }
-                            "X" | "Z" => {
-                                // todo!("ground")
+                            "W" | "Y" => {
+                                // todo!("power")
                                 let pin = Pin::new(51);
                                 connected_pin.insert(pin);
                             }
-                            "W" | "Y" => {
-                                // todo!("power")
+                            "X" | "Z" => {
+                                // todo!("ground")
                                 let pin = Pin::new(52);
                                 connected_pin.insert(pin);
                             }
