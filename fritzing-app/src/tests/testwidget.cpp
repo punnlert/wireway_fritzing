@@ -12,7 +12,6 @@ TestWidget::TestWidget(QWidget *parent)
     , m_voltageChartView(nullptr)
     , m_voltageSeries(nullptr)
     , m_voltageChart(nullptr)
-    , m_firstTimestamp(0)
 {
     setupUI();
     setupConnections();
@@ -347,7 +346,7 @@ void TestWidget::createMeasureVoltageTestDisplay(const QJsonObject &test, QWidge
     
     QVBoxLayout *testLayout = new QVBoxLayout(testWidget);
     testLayout->setContentsMargins(10, 10, 10, 10);
-    testLayout->setSpacing(8);
+    testLayout->setSpacing(12);
     
     // Test title
     QLabel *titleLabel = new QLabel(test["title"].toString());
@@ -362,7 +361,7 @@ void TestWidget::createMeasureVoltageTestDisplay(const QJsonObject &test, QWidge
     
     // Graph area (middle section) - now with actual chart
     QFrame *graphFrame = new QFrame(testWidget);
-    graphFrame->setStyleSheet("QFrame { background-color: white; border: 2px solid #ccc; border-radius: 5px; min-height: 200px; }");
+    graphFrame->setStyleSheet("QFrame { background-color: white; min-height: 300px; }");
     graphFrame->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     
     QVBoxLayout *graphLayout = new QVBoxLayout(graphFrame);
@@ -379,7 +378,7 @@ void TestWidget::createMeasureVoltageTestDisplay(const QJsonObject &test, QWidge
     
     // Create axes
     QValueAxis *axisY = new QValueAxis();
-    axisY->setTitleText("Voltage (V)");
+    axisY->setTitleText("V");
     axisY->setRange(0, 5);
     axisY->setLabelFormat("%.2f");
     
@@ -397,10 +396,10 @@ void TestWidget::createMeasureVoltageTestDisplay(const QJsonObject &test, QWidge
     qDebug() << "📊 Chart created with axes - Y:" << axisY->min() << "to" << axisY->max() << "X:" << axisX->min() << "to" << axisX->max();
     qDebug() << "📊 Series attached to axes, series count:" << testSeries->count();
     
-    // Create chart view with proper size constraints
+    // Create chart view with proper size constraints for full expansion
     QChartView *testChartView = new QChartView(testChart);
     testChartView->setRenderHint(QPainter::Antialiasing);
-    testChartView->setMinimumHeight(180);
+    testChartView->setMinimumHeight(250);
     testChartView->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     testChartView->setContentsMargins(0, 0, 0, 0);
     
