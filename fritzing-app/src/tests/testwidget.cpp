@@ -565,20 +565,20 @@ void TestWidget::createSwitchConnectionSuggestionTestDisplay(const QJsonObject &
     testLayout->addWidget(descLabel);
     
     // Middle section - connection suggestion text
-    QString pinFrom = test["pin_from"].toString();
-    QString pinTo = test["pin_to"].toString();
+    QString rowFrom = test["row_from"].toString();
+    QString rowTo = test["row_to"].toString();
     
     // Debug: Print the test data to see what's available
     qDebug() << "🔌 Switch connection test data:" << test;
     qDebug() << "🔌 jsondata:" << test["jsondata"];
-    qDebug() << "🔌 pin_from raw:" << test["pin_from"];
-    qDebug() << "🔌 pin_to raw:" << test["pin_to"];
-    qDebug() << "🔌 pin_from type:" << test["pin_from"].type();
-    qDebug() << "🔌 pin_to type:" << test["pin_to"].type();
-    qDebug() << "🔌 pin_from toString:" << pinFrom;
-    qDebug() << "🔌 pin_to toString:" << pinTo;
+    qDebug() << "🔌 row_from raw:" << test["row_from"];
+    qDebug() << "🔌 row_to raw:" << test["row_to"];
+    qDebug() << "🔌 row_from type:" << test["row_from"].type();
+    qDebug() << "🔌 row_to type:" << test["row_to"].type();
+    qDebug() << "🔌 row_from toString:" << rowFrom;
+    qDebug() << "🔌 row_to toString:" << rowTo;
     
-    QString suggestionText = QString("You should switch pin %1 (non blinking pin) connection to %2 (blinking pin) row").arg(pinFrom).arg(pinTo);
+    QString suggestionText = QString("You should switch the connection on row %1 (non blinking row) to %2 row (blinking)").arg(rowFrom).arg(rowTo);
     
     QLabel *suggestionLabel = new QLabel(suggestionText);
     suggestionLabel->setStyleSheet("QLabel { font-family: 'Droid Sans'; font-size: 11px; color: #333; background-color: #f0f0f0; padding: 8px; border: 1px solid #ccc; border-radius: 3px; }");

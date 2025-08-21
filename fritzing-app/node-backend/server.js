@@ -97,7 +97,7 @@ const tools = [
         jsondata: {
           type: "object",
           properties: {
-            pin_from: {
+            row_from: {
               type: "string",
               enum: [
                 "1",
@@ -159,11 +159,11 @@ const tools = [
                 "vcc",
                 "gnd",
               ],
-              description: "the pin that the student mistakenly connected",
+              description: "the row that the student mistakenly connected",
             },
-            pin_to: {
+            row_to: {
               type: "string",
-              description: "the pin that the student should connect to",
+              description: "the row that the student should connect to",
               enum: [
                 "1",
                 "2",
@@ -226,7 +226,7 @@ const tools = [
               ],
             },
           },
-          required: ["pin_from", "pin_to"],
+          required: ["row_from", "row_to"],
           additionalProperties: false,
         },
       },
@@ -382,8 +382,8 @@ function add_switch_connection_suggestion({ title, description, jsondata }) {
       title: title,
       description: description,
       jsondata: jsondata || {},
-      pin_from: jsondata?.pin_from || "",
-      pin_to: jsondata?.pin_to || "",
+      row_from: jsondata?.row_from || "",
+      row_to: jsondata?.row_to || "",
       completed: false,
     };
 
@@ -1018,20 +1018,20 @@ async function processCommand(command) {
           blink_row(test.jsondata.measure_row, "blink");
         } else if (test.type === "switch_connection_suggestion") {
           // INSERT_YOUR_CODE
-          // Determine if pin_from is a number (row) or a command pin (like 'a0', 'd1', etc.)
-          if (!isNaN(Number(test.jsondata.pin_from))) {
-            blink_row(Number(test.jsondata.pin_from), "on");
+          // Determine if row_from is a number (row) or a command pin (like 'a0', 'd1', etc.)
+          if (!isNaN(Number(test.jsondata.row_from))) {
+            blink_row(Number(test.jsondata.row_from), "on");
           } else {
-            blink_command_pin(test.jsondata.pin_from, "on");
+            blink_command_pin(test.jsondata.row_from, "on");
           }
 
-          if (!isNaN(Number(test.jsondata.pin_to))) {
-            blink_row(Number(test.jsondata.pin_to), "blink2");
+          if (!isNaN(Number(test.jsondata.row_to))) {
+            blink_row(Number(test.jsondata.row_to), "blink2");
           } else {
-            blink_command_pin(test.jsondata.pin_to, "blink2");
+            blink_command_pin(test.jsondata.row_to, "blink2");
           }
-          // blink_row(test.jsondata.pin_from, "on");
-          // blink_row(test.jsondata.pin_to, "blink2");
+          // blink_row(test.jsondata.row_from, "on");
+          // blink_row(test.jsondata.row_to, "blink2");
         }
 
         setTimeout(() => {
@@ -1215,9 +1215,9 @@ testGroups = [
         title: "Switch connection suggestion",
         description:
           "The student mistakenly connected pin 10 to pin 11. You should switch the connection to pin 12.",
-        jsondata: { pin_from: "10", pin_to: "gnd" },
-        pin_from: "10",
-        pin_to: "gnd",
+        jsondata: { row_from: "10", row_to: "gnd" },
+        row_from: "10",
+        row_to: "gnd",
         userObservation: "",
         completed: false,
       },
