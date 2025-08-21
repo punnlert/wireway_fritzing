@@ -360,11 +360,6 @@ void BlinkBoardWidget::handleNodeProcessOutput() {
         handleTestsReceived(tests);
       }
       
-      // Check if this is a test groups update
-      if (response.contains("type") && response["type"].toString() == "test_groups_updated") {
-        QJsonArray tests = response["testGroups"].toArray();
-        emit testGroupsUpdated(tests);
-      }
     } else {
       // Check if it's a raw chat message (non-JSON)
       if (line.startsWith("chat:")) {

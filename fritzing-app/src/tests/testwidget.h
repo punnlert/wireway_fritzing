@@ -58,6 +58,7 @@ private:
     void createTestGroupCard(const QJsonObject &testGroup);
     QLineEdit* createSelfObserveTestDisplay(const QJsonObject &test, QWidget *parent, QVBoxLayout *parentLayout);
     void createMeasureVoltageTestDisplay(const QJsonObject &test, QWidget *parent, QVBoxLayout *parentLayout);
+    void createSwitchConnectionSuggestionTestDisplay(const QJsonObject &test, QWidget *parent, QVBoxLayout *parentLayout);
     void clearCards();
     
     // Backend handling

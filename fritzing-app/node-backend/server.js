@@ -25,6 +25,7 @@ Blinkboard Schematics
 [25, 1] [25, 2] [25, 3] [25, 4] [25, 5] | [50, 1] [50, 2] [50, 3] [50, 4] [50, 5]
 
 where [51, 1] is the positive rail and [52, 1] is a negative rail. The number for the positive and negative rails are just for annotations in the code representation of the circuit, you should only call them positive and negative rail and you should NOT call them by their number. The same row of the breadboard is connected.
+So, instead of saying [51, 1] and [52, 1], you should say "positive rail" and "negative rail".
 
 the blinkboard also has a built-in analog and digital I/O pins that can be used to your advantage.
 - pins A0, A1, A2 can be used to sensing voltage at various point in the circuit in relative to ground.
@@ -45,8 +46,8 @@ let testGroups = []; // Store test groups for the test window
 let serialPorts = [];
 let blinkboard_serial_port;
 
-// const gpt_model = "gpt-4o-mini";
-const gpt_model = "o4-mini";
+const gpt_model = "gpt-4o-mini";
+// const gpt_model = "o4-mini";
 
 // Helper function to create error responses with line numbers
 function createErrorResponse(error, lineNumber) {
@@ -63,6 +64,57 @@ function createErrorResponse(error, lineNumber) {
 }
 
 const tools = [
+  // {
+  //   type: "function",
+  //   name: "add_test_group",
+  //   description:
+  //     "Adding a test group. One test group should have only one goal that you want to prove.",
+  //   parameters: {
+  //     type: "object",
+  //     properties: {
+  //       title: { type: "string" },
+  //       description: { type: "string" },
+  //     },
+  //     required: ["title", "description"],
+  //     additionalProperties: false,
+  //   },
+  //   strict: true,
+  // },
+  {
+    type: "function",
+    name: "add_switch_connection_suggestion",
+    description:
+      "Sometimes, the student might mistakenly connect some pins in the wrong hole. This is how we suggest them to fix it.",
+    parameters: {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        description: { type: "string" },
+        jsondata: {
+          type: "object",
+          properties: {
+            pin_from: {
+              type: "number",
+              maximum: 50,
+              minimum: 1,
+              description: "the pin that the student mistakenly connected",
+            },
+            pin_to: {
+              type: "number",
+              maximum: 50,
+              minimum: 1,
+              description: "the pin that the student should connect to",
+            },
+          },
+          required: ["pin_from", "pin_to"],
+          additionalProperties: false,
+        },
+      },
+      required: ["title", "description", "jsondata"],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
   {
     type: "function",
     name: "add_self_observe_test",
@@ -138,7 +190,7 @@ function add_self_observe_test({ title, description, jsondata }) {
 
   // Find the latest test group and add the new test
   if (testGroups.length > 0) {
-    const latestGroup = testGroups[testGroups.length - 1];
+    const latestGroupIndex = testGroups.length - 1;
 
     const newTest = {
       id: Date.now().toString(),
@@ -151,19 +203,10 @@ function add_self_observe_test({ title, description, jsondata }) {
       completed: false,
     };
 
-    latestGroup.tests.push(newTest);
+    testGroups[latestGroupIndex].tests.push(newTest);
 
     console.log(
-      `✅ Added self observation test "${title}" to group "${latestGroup.title}"`
-    );
-
-    // Send the updated test groups to the frontend
-    console.log(
-      JSON.stringify({
-        type: "test_groups_updated",
-        testGroups: testGroups,
-        timestamp: Date.now(),
-      })
+      `✅ Added self observation test "${title}" to group "${testGroups[latestGroupIndex].title}"`
     );
 
     return newTest.id;
@@ -174,11 +217,11 @@ function add_self_observe_test({ title, description, jsondata }) {
 }
 
 function add_measure_voltage_test({ title, description, jsondata }) {
-  console.log("add_measure_voltage_test", title, description, jsondata);
+  // console.log("add_measure_voltage_test", title, description, jsondata);
 
   // Find the latest test group and add the new test
   if (testGroups.length > 0) {
-    const latestGroup = testGroups[testGroups.length - 1];
+    const latestGroupIndex = testGroups.length - 1;
 
     // Create new test object
     const newTest = {
@@ -194,19 +237,41 @@ function add_measure_voltage_test({ title, description, jsondata }) {
     };
 
     // Add test to the latest group
-    latestGroup.tests.push(newTest);
+    testGroups[latestGroupIndex].tests.push(newTest);
 
     console.log(
-      `✅ Added measure voltage test "${title}" to group "${latestGroup.title}"`
+      `✅ Added measure voltage test "${title}" to group "${testGroups[latestGroupIndex].title}"`
     );
+  } else {
+    console.log(
+      "⚠️ No test groups available. Cannot add measure voltage test."
+    );
+  }
+}
 
-    // Emit test groups updated event to frontend
-    process.stdout.write(
-      JSON.stringify({
-        type: "test_groups_updated",
-        testGroups: testGroups,
-        timestamp: Date.now(),
-      }) + "\n"
+function add_switch_connection_suggestion({ title, description, jsondata }) {
+  console.log("add_switch_connection_suggestion", title, description, jsondata);
+
+  if (testGroups.length > 0) {
+    const latestGroupIndex = testGroups.length - 1;
+
+    // Create new test object
+    const newTest = {
+      id: `test_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      type: "switch_connection_suggestion",
+      title: title,
+      description: description,
+      jsondata: jsondata || {},
+      pin_from: jsondata?.pin_from || 1,
+      pin_to: jsondata?.pin_to || 1,
+      completed: false,
+    };
+
+    // Add test to the latest group
+    testGroups[latestGroupIndex].tests.push(newTest);
+
+    console.log(
+      `✅ Added measure voltage test "${title}" to group "${testGroups[latestGroupIndex].title}"`
     );
   } else {
     console.log(
@@ -228,7 +293,7 @@ class EventHandler extends EventEmitter {
       // Retrieve events that are denoted with 'requires_action'
       // since these will have our tool_calls
       if (event.type === "response.output_item.added") {
-        if (event.item.type === "message") {
+        if (event.item.type === "message" || event.item.type === "reasoning") {
           process.stdout.write(
             JSON.stringify({
               type: "streaming_start",
@@ -260,16 +325,26 @@ class EventHandler extends EventEmitter {
         const function_calls = event.response.output.filter(
           (output) => output.type === "function_call"
         );
+        console.log("function_calls", function_calls);
 
         if (function_calls.length > 0) {
           const set_count = testGroups.length + 1;
+
           testGroups.push({
             id: Date.now().toString(),
             title: `Debug ${set_count}`,
             description: `Debug ${set_count}`,
             tests: [],
           });
+          console.log("testGroups", testGroups);
           this.handle_function_calls(function_calls);
+          process.stdout.write(
+            JSON.stringify({
+              type: "test_groups_updated",
+              testGroups: testGroups,
+              timestamp: Date.now(),
+            }) + "\n"
+          );
         }
       } else if (event.type === "response.output_text.done") {
         // TODO: tell the frontend that the output is done
@@ -290,10 +365,6 @@ class EventHandler extends EventEmitter {
           }) + "\n"
         );
         console.log("output is done");
-      } else if (event.type === "response.output_text.delta") {
-        // current_gpt_answer.text += event.delta;
-        // chat_scroll_area?.scrollToBottom();
-        // No longer sending delta events - just accumulate content internally
       }
     } catch (error) {
       console.error("Error handling event:", error);
@@ -324,6 +395,21 @@ class EventHandler extends EventEmitter {
               response.arguments
             );
             const test_key = add_measure_voltage_test({
+              title,
+              description,
+              jsondata,
+            });
+
+            openai_chat_history.push({
+              type: "function_call_output",
+              call_id: response.call_id,
+              output: JSON.stringify({ test_key, successfully_added: true }),
+            });
+          } else if (response.name === "add_switch_connection_suggestion") {
+            const { title, description, jsondata } = JSON.parse(
+              response.arguments
+            );
+            const test_key = add_switch_connection_suggestion({
               title,
               description,
               jsondata,
@@ -778,13 +864,15 @@ async function processCommand(command) {
       try {
         const { groupId, results } = command;
         // console.log(`📝 Received test results for group ${groupId}:`, results);
+        console.log(`📝 Received test results for group ${groupId}:`, results);
+        console.log("results", results);
 
         const message = `this is the test results that we have run. \n ${JSON.stringify(
           results
         )} \n 
         please analyze the test results and provide a summary of the test results.
         `;
-        await send_openai_message(message);
+        // await send_openai_message(message);
 
         return {
           status: "success",
@@ -808,6 +896,9 @@ async function processCommand(command) {
         } else if (test.type === "measure_voltage") {
           blink_command_pin(test.jsondata.measure_pin, "blink");
           blink_row(test.jsondata.measure_row, "blink");
+        } else if (test.type === "switch_connection_suggestion") {
+          blink_row(test.jsondata.pin_from, "on");
+          blink_row(test.jsondata.pin_to, "blink2");
         }
 
         setTimeout(() => {
@@ -832,7 +923,7 @@ async function processCommand(command) {
 
       setTimeout(() => {
         clearInterval(voltage_data_interval);
-      }, 10000);
+      }, 10500);
 
       return {
         status: "success",
@@ -840,28 +931,28 @@ async function processCommand(command) {
         timestamp: Date.now(),
       };
 
-    case "add_test_group":
-      // Add a new test group to the collection
-      const { testGroupData } = command;
-      if (testGroupData) {
-        const newTestGroup = {
-          id: Date.now().toString(), // Simple ID generation as string
-          ...testGroupData,
-          timestamp: Date.now(),
-        };
-        testGroups.push(newTestGroup);
-        return {
-          status: "success",
-          message: "Test group added successfully",
-          testGroup: newTestGroup,
-          timestamp: Date.now(),
-        };
-      } else {
-        return createErrorResponse(
-          new Error("No test group data provided"),
-          365
-        );
-      }
+    // case "add_test_group":
+    //   // Add a new test group to the collection
+    //   const { testGroupData } = command;
+    //   if (testGroupData) {
+    //     const newTestGroup = {
+    //       id: Date.now().toString(), // Simple ID generation as string
+    //       ...testGroupData,
+    //       timestamp: Date.now(),
+    //     };
+    //     testGroups.push(newTestGroup);
+    //     return {
+    //       status: "success",
+    //       message: "Test group added successfully",
+    //       testGroup: newTestGroup,
+    //       timestamp: Date.now(),
+    //     };
+    //   } else {
+    //     return createErrorResponse(
+    //       new Error("No test group data provided"),
+    //       365
+    //     );
+    //   }
 
     case "get_serial_ports":
       // Refresh and return available serial ports
@@ -983,6 +1074,18 @@ testGroups = [
         measureRow: 15,
         completed: false,
         voltageData: [],
+      },
+      {
+        id: "sc_demo_1",
+        type: "switch_connection_suggestion",
+        title: "Switch connection suggestion",
+        description:
+          "The student mistakenly connected pin 10 to pin 11. You should switch the connection to pin 12.",
+        jsondata: { pin_from: 10, pin_to: 11 },
+        pin_from: 10,
+        pin_to: 11,
+        userObservation: "",
+        completed: false,
       },
     ],
     timestamp: Date.now(),
