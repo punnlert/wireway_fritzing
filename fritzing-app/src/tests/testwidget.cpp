@@ -733,16 +733,16 @@ void TestWidget::handleVoltageDataReceived(const QJsonObject &voltageData)
                 if (!currentTest.isEmpty()) break;
             }
             
-            // Determine which voltage value to plot based on test.measure_pin
+            // Determine which voltage value to plot based on test.blinkboard_adc_row
             double voltageToPlot = a0; // default to A0
-            QString measurePin = currentTest["measurePin"].toString().toLower();
-            if (measurePin == "a1") {
+            QString blinkboardADCRow = currentTest["blinkboardADCRow"].toString().toLower();
+            if (blinkboardADCRow == "a1") {
                 voltageToPlot = a1;
-            } else if (measurePin == "a2") {
+            } else if (blinkboardADCRow == "a2") {
                 voltageToPlot = a2;
             }
             
-            qDebug() << "📊 Adding data point: ms=" << msSinceStart << "voltage=" << voltageToPlot << "from pin" << measurePin;
+            qDebug() << "📊 Adding data point: ms=" << msSinceStart << "voltage=" << voltageToPlot << "from pin" << blinkboardADCRow;
             
             // Add point to the series using milliseconds since start
             series->append(msSinceStart, voltageToPlot);

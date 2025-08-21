@@ -28,8 +28,10 @@ where [51, 1] is the positive rail and [52, 1] is a negative rail. The number fo
 So, instead of saying [51, 1] and [52, 1], you should say "positive rail" and "negative rail".
 
 
-the blinkboard also has a built-in analog and digital I/O pins that can be used to your advantage.
-- pins A0, A1, A2 can be used to sensing voltage at various point in the circuit in relative to ground.
+the blinkboard also has a built-in analog and digital I/O rows that can be used to your advantage.
+- rows A0, A1, A2 can be used to sensing voltage at various point in the circuit in relative to ground.
+- rows D0, D1 can be used to output high and low voltage and PWM.
+- row D2 can be used to output analog voltage between 0 and 4.5V.
 
 Your job is to help the student debug the circuit using your understanding of the circuit
 
@@ -159,11 +161,13 @@ const tools = [
                 "vcc",
                 "gnd",
               ],
-              description: "the row that the student mistakenly connected",
+              description:
+                "the row that the student mistakenly connected. please note that these are the rows name for all rows available on the blinkboards. other component may have pins with the same name. be careful to not make mistake.",
             },
             row_to: {
               type: "string",
-              description: "the row that the student should connect to",
+              description:
+                "the row that the student should connect to. please note that these are the rows name for all rows available on the blinkboards. other component may have pins with the same name. be careful to not make mistake.",
               enum: [
                 "1",
                 "2",
@@ -248,14 +252,14 @@ const tools = [
         jsondata: {
           type: "object",
           properties: {
-            pin: {
+            row: {
               type: "array",
               items: { type: "number", maximum: 50, minimum: 1 },
               description:
-                "pins that you want to blink to better support your message",
+                "rows that you want to blink to better support your message",
             },
           },
-          required: ["pin"],
+          required: ["row"],
           additionalProperties: false,
         },
       },
@@ -281,10 +285,10 @@ const tools = [
         jsondata: {
           type: "object",
           properties: {
-            measure_pin: {
+            blinkboard_adc_row: {
               type: "string",
               description:
-                "you can decide by yourself which pin to use for measuring. this is the blinkboard built-in adc pins",
+                "you can decide by yourself which ADC row to use for measuring. this is the blinkboard built-in adc rows",
               enum: ["a0", "a1", "a2"],
             },
             measure_row: {
@@ -294,7 +298,7 @@ const tools = [
               minimum: 1,
             },
           },
-          required: ["measure_pin", "measure_row"],
+          required: ["blinkboard_adc_row", "measure_row"],
           additionalProperties: false,
         },
       },
@@ -350,7 +354,7 @@ function add_measure_voltage_test({ title, description, jsondata }) {
       title: title,
       description: description,
       jsondata: jsondata || {},
-      measurePin: jsondata?.measure_pin || "A0",
+      blinkboardADCRow: jsondata?.blinkboard_adc_row || "A0",
       measureRow: jsondata?.measure_row || 1,
       completed: false,
       voltageData: [], // Will store voltage measurements
@@ -1012,9 +1016,9 @@ async function processCommand(command) {
         console.log(`Test data:`, test);
 
         if (test.type === "self_observe") {
-          blink_rows(test.jsondata.pin, "blink");
+          blink_rows(test.jsondata.row, "blink");
         } else if (test.type === "measure_voltage") {
-          blink_command_pin(test.jsondata.measure_pin, "blink");
+          blink_command_pin(test.jsondata.blinkboard_adc_row, "blink");
           blink_row(test.jsondata.measure_row, "blink");
         } else if (test.type === "switch_connection_suggestion") {
           // INSERT_YOUR_CODE
@@ -1169,61 +1173,61 @@ process.on("unhandledRejection", (reason, promise) => {
 
 // Initialize with some sample test groups
 testGroups = [
-  {
-    id: "1",
-    title: "Circuit Validation Tests",
-    description:
-      "Basic validation tests for circuit components and connections",
-    tests: [
-      // {
-      //   name: "Component Connection Test",
-      //   description: "Verify all components are properly connected",
-      // },
-      // {
-      //   name: "Power Supply Test",
-      //   description: "Check power supply connections and voltage levels",
-      // },
-      // {
-      //   name: "Signal Flow Test",
-      //   description: "Validate signal paths through the circuit",
-      // },
-      {
-        id: "so_demo_1",
-        type: "self_observe",
-        title: "When you press the button, what does the LED do?",
-        description:
-          "Press and release the button a few times and describe the LED behavior.",
-        jsondata: { pin: [10] },
-        userObservation: "",
-        completed: false,
-      },
-      {
-        id: "mv_demo_1",
-        type: "measure_voltage",
-        title: "Measure voltage at row 15 using A0",
-        description:
-          "Rotate the potentiometer from end to end while measuring the voltage.",
-        jsondata: { measure_pin: "a0", measure_row: 15 },
-        measurePin: "a0",
-        measureRow: 15,
-        completed: false,
-        voltageData: [],
-      },
-      {
-        id: "sc_demo_1",
-        type: "switch_connection_suggestion",
-        title: "Switch connection suggestion",
-        description:
-          "The student mistakenly connected pin 10 to pin 11. You should switch the connection to pin 12.",
-        jsondata: { row_from: "10", row_to: "gnd" },
-        row_from: "10",
-        row_to: "gnd",
-        userObservation: "",
-        completed: false,
-      },
-    ],
-    timestamp: Date.now(),
-  },
+  // {
+  //   id: "1",
+  //   title: "Circuit Validation Tests",
+  //   description:
+  //     "Basic validation tests for circuit components and connections",
+  //   tests: [
+  //     // {
+  //     //   name: "Component Connection Test",
+  //     //   description: "Verify all components are properly connected",
+  //     // },
+  //     // {
+  //     //   name: "Power Supply Test",
+  //     //   description: "Check power supply connections and voltage levels",
+  //     // },
+  //     // {
+  //     //   name: "Signal Flow Test",
+  //     //   description: "Validate signal paths through the circuit",
+  //     // },
+  //     {
+  //       id: "so_demo_1",
+  //       type: "self_observe",
+  //       title: "When you press the button, what does the LED do?",
+  //       description:
+  //         "Press and release the button a few times and describe the LED behavior.",
+  //       jsondata: { row: [10] },
+  //       userObservation: "",
+  //       completed: false,
+  //     },
+  //     {
+  //       id: "mv_demo_1",
+  //       type: "measure_voltage",
+  //       title: "Measure voltage at row 15 using A0",
+  //       description:
+  //         "Rotate the potentiometer from end to end while measuring the voltage.",
+  //       jsondata: { blinkboard_adc_row: "a0", measure_row: 15 },
+  //       blinkboardADCRow: "a0",
+  //       measureRow: 15,
+  //       completed: false,
+  //       voltageData: [],
+  //     },
+  //     {
+  //       id: "sc_demo_1",
+  //       type: "switch_connection_suggestion",
+  //       title: "Switch connection suggestion",
+  //       description:
+  //         "The student mistakenly connected pin 10 to pin 11. You should switch the connection to pin 12.",
+  //       jsondata: { row_from: "10", row_to: "gnd" },
+  //       row_from: "10",
+  //       row_to: "gnd",
+  //       userObservation: "",
+  //       completed: false,
+  //     },
+  //   ],
+  //   timestamp: Date.now(),
+  // },
   // {
   //   id: "2",
   //   title: "Performance Tests",
