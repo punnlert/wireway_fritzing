@@ -36,10 +36,12 @@ public slots:
   void requestTestsFromBackend();
   void submitTestResultsToBackend(const QString &groupId, const QJsonObject &results);
   void handleBlinkRequest(const QJsonObject &test, const QString &action);
+  void handleMeasureRequest(const QJsonObject &test);
 
 signals:
   void testsReceived(const QJsonArray &tests);
   void testGroupsUpdated(const QJsonArray &testGroups);
+  void voltageDataReceived(const QJsonObject &voltageData);
 
 protected slots:
   void handleButtonClick();
@@ -94,5 +96,6 @@ protected:
   
   // Test handling
   void handleTestsReceived(const QJsonArray &tests);
+  void handleAnalogReadData(const QJsonObject &event);
 };
 #endif

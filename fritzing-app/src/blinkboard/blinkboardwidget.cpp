@@ -331,13 +331,20 @@ void BlinkBoardWidget::handleNodeProcessOutput() {
           handleFunctionCalling();
           continue;
         }
-      }
-      
-      // Check if this is a chat message response
-      if (response.contains("type") && response["type"].toString() == "chat") {
-        QString message = response["message"].toString();
-        if (!message.isEmpty()) {
-          handleMessageReceived(message);
+        else if (type == "analog_read_data") {
+          qDebug() << "🔍 Analog read data from backend:" << response;
+          handleAnalogReadData(response);
+          continue;
+        } else if (type == "test_groups_updated") {
+          QJsonArray tests = response["testGroups"].toArray();
+          emit testGroupsUpdated(tests);
+          continue;
+        } else if (type == "chat") {
+          QString message = response["message"].toString();
+          if (!message.isEmpty()) {
+            handleMessageReceived(message);
+          }
+          continue;
         }
       }
       
@@ -859,4 +866,54 @@ void BlinkBoardWidget::handleBlinkRequest(const QJsonObject &test, const QString
   m_nodeProcess->write(jsonString.toUtf8() + "\n");
   
   addChatMessage("Blink command sent to backend.", false);
+}
+
+void BlinkBoardWidget::handleMeasureRequest(const QJsonObject &test)
+{
+  if (m_nodeProcess->state() != QProcess::Running) {
+    addChatMessage("Not connected to backend. Cannot send measure command.", false);
+    return;
+  }
+
+  // Create command to send measure request to backend
+  QJsonObject jsonCommand;
+  jsonCommand["command"] = "request_voltage_data";
+  jsonCommand["test"] = test;
+  jsonCommand["timestamp"] = QDateTime::currentMSecsSinceEpoch();
+  
+  QJsonDocument doc(jsonCommand);
+  QString jsonString = doc.toJson(QJsonDocument::Compact);
+  
+  qDebug() << "📊 Sending measure request to Node.js backend:" << jsonString.left(200) + "...";
+  m_nodeProcess->write(jsonString.toUtf8() + "\n");
+  
+  addChatMessage("Measure command sent to backend. Collecting voltage data...", false);
+}
+
+void BlinkBoardWidget::handleAnalogReadData(const QJsonObject &event)
+{
+  // Parse the analog read data
+  QString dataString = event["data"].toString();
+  QJsonDocument dataDoc = QJsonDocument::fromJson(dataString.toUtf8());
+  
+  if (dataDoc.isObject()) {
+    QJsonObject analogData = dataDoc.object();
+    
+    // Extract voltage values
+    double a0 = analogData["a0"].toDouble();
+    double a1 = analogData["a1"].toDouble();
+    double a2 = analogData["a2"].toDouble();
+    
+    qDebug() << "📊 Received analog data - A0:" << a0 << "A1:" << a1 << "A2:" << a2;
+    
+    // Create voltage data object
+    QJsonObject voltageData;
+    voltageData["a0"] = a0;
+    voltageData["a1"] = a1;
+    voltageData["a2"] = a2;
+    voltageData["timestamp"] = event["timestamp"].toVariant().toLongLong();
+    
+    // Emit signal to TestWidget with voltage data
+    emit voltageDataReceived(voltageData);
+  }
 }

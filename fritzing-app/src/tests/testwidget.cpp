@@ -2,11 +2,16 @@
 #include <QMessageBox>
 #include <QDateTime>
 #include <QLineEdit>
+#include <QPainter>
+#include <QFont>
 
 TestWidget::TestWidget(QWidget *parent)
     : QWidget(parent)
     , m_mainLayout(nullptr)
     , m_cardLayout(nullptr)
+    , m_voltageChartView(nullptr)
+    , m_voltageSeries(nullptr)
+    , m_voltageChart(nullptr)
 {
     setupUI();
     setupConnections();
@@ -23,6 +28,17 @@ void TestWidget::setupUI()
     // Set Fritzing-style margins and spacing
     m_mainLayout->setContentsMargins(10, 10, 10, 10);
     m_mainLayout->setSpacing(15);
+    
+    // Initialize chart components
+    m_voltageChart = new QChart();
+    m_voltageSeries = new QLineSeries();
+    m_voltageChart->addSeries(m_voltageSeries);
+    m_voltageChart->setTitle("Voltage Measurements");
+    m_voltageChart->createDefaultAxes();
+    
+    m_voltageChartView = new QChartView(m_voltageChart);
+    m_voltageChartView->setRenderHint(QPainter::Antialiasing);
+    m_voltageChartView->setMinimumHeight(200);
     
     // Add test management buttons at the top
     QHBoxLayout *buttonLayout = new QHBoxLayout();
@@ -277,7 +293,7 @@ QLineEdit* TestWidget::createSelfObserveTestDisplay(const QJsonObject &test, QWi
     
     QVBoxLayout *testLayout = new QVBoxLayout(testWidget);
     testLayout->setContentsMargins(10, 10, 10, 10);
-    testLayout->setSpacing(2);
+    testLayout->setSpacing(8);
     
     // Test title
     QLabel *titleLabel = new QLabel(test["title"].toString());
@@ -330,7 +346,7 @@ void TestWidget::createMeasureVoltageTestDisplay(const QJsonObject &test, QWidge
     
     QVBoxLayout *testLayout = new QVBoxLayout(testWidget);
     testLayout->setContentsMargins(10, 10, 10, 10);
-    testLayout->setSpacing(2);
+    testLayout->setSpacing(8);
     
     // Test title
     QLabel *titleLabel = new QLabel(test["title"].toString());
@@ -343,20 +359,62 @@ void TestWidget::createMeasureVoltageTestDisplay(const QJsonObject &test, QWidge
     descLabel->setWordWrap(true);
     testLayout->addWidget(descLabel);
     
-    // Graph placeholder area (middle section)
+    // Graph area (middle section) - now with actual chart
     QFrame *graphFrame = new QFrame(testWidget);
-    graphFrame->setStyleSheet("QFrame { background-color: white; border: 2px dashed #ccc; border-radius: 5px; min-height: 120px; }");
-    graphFrame->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    graphFrame->setStyleSheet("QFrame { background-color: white; border: 2px solid #ccc; border-radius: 5px; min-height: 200px; }");
+    graphFrame->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     
     QVBoxLayout *graphLayout = new QVBoxLayout(graphFrame);
-    graphLayout->setContentsMargins(10, 10, 10, 10);
+    graphLayout->setContentsMargins(0, 0, 0, 0);
+    graphLayout->setSpacing(0);
     
-    QLabel *graphPlaceholder = new QLabel("Graph will be displayed here", graphFrame);
-    graphPlaceholder->setStyleSheet("QLabel { font-family: 'Droid Sans'; font-size: 10px; color: #999; }");
-    graphPlaceholder->setAlignment(Qt::AlignCenter);
-    graphLayout->addWidget(graphPlaceholder);
+    // Create individual chart for this test
+    QChart *testChart = new QChart();
+    testChart->legend()->hide(); // Hide the legend completely
     
+    QLineSeries *testSeries = new QLineSeries();
+    testSeries->setName(""); // Empty name to avoid legend entry
+    testChart->addSeries(testSeries);
+    
+    // Create axes
+    QValueAxis *axisY = new QValueAxis();
+    axisY->setTitleText("Voltage (V)");
+    axisY->setRange(0, 5);
+    axisY->setLabelFormat("%.2f");
+    
+    QValueAxis *axisX = new QValueAxis();
+    axisX->setTitleText("Time (ms)");
+    axisX->setRange(0, 10000); // 10 seconds in milliseconds
+    axisX->setLabelFormat("%.0f");
+    
+    testChart->addAxis(axisY, Qt::AlignLeft);
+    testChart->addAxis(axisX, Qt::AlignBottom);
+    
+    testSeries->attachAxis(axisX);
+    testSeries->attachAxis(axisY);
+    
+    qDebug() << "📊 Chart created with axes - Y:" << axisY->min() << "to" << axisY->max() << "X:" << axisX->min() << "to" << axisX->max();
+    qDebug() << "📊 Series attached to axes, series count:" << testSeries->count();
+    
+    // Create chart view with proper size constraints
+    QChartView *testChartView = new QChartView(testChart);
+    testChartView->setRenderHint(QPainter::Antialiasing);
+    testChartView->setMinimumHeight(180);
+    testChartView->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    testChartView->setContentsMargins(0, 0, 0, 0);
+    
+    // Store chart references in the test object for later updates
+    QString testId = test["id"].toString();
+    if (!testId.isEmpty()) {
+        m_testCharts[testId] = testChart;
+        m_testSeries[testId] = testSeries;
+    }
+    
+    graphLayout->addWidget(testChartView);
     testLayout->addWidget(graphFrame);
+    
+    // Add some spacing after the graph
+    testLayout->addSpacing(10);
     
     // Button area (bottom section)
     QHBoxLayout *buttonLayout = new QHBoxLayout();
@@ -381,7 +439,8 @@ void TestWidget::createMeasureVoltageTestDisplay(const QJsonObject &test, QWidge
     // Connect measure button (placeholder for now)
     connect(measureButton, &QPushButton::clicked, [this, test]() {
         qDebug() << "📊 Measure button clicked for measure voltage test:" << test["title"].toString();
-        // TODO: Implement measure functionality
+        qDebug() << "📊 Test ID:" << test["id"].toString();
+        this->handleMeasureRequest(test);
     });
     
     buttonLayout->addWidget(blinkButton);
@@ -395,3 +454,89 @@ void TestWidget::createMeasureVoltageTestDisplay(const QJsonObject &test, QWidge
     
     qDebug() << "✅ Measure voltage test displayed in TestWidget:" << test["title"].toString();
 }
+
+void TestWidget::handleVoltageDataReceived(const QJsonObject &voltageData)
+{
+    qDebug() << "📊 TestWidget received voltage data:" << voltageData;
+    
+    // Extract voltage values
+    double a0 = voltageData["a0"].toDouble();
+    double a1 = voltageData["a1"].toDouble();
+    double a2 = voltageData["a2"].toDouble();
+    qint64 timestamp = voltageData["timestamp"].toVariant().toLongLong();
+    
+    qDebug() << "Voltage values - A0:" << a0 << "A1:" << a1 << "A2:" << a2 << "at" << timestamp;
+    
+    // Find the current measuring test and update its chart
+    if (!m_currentMeasuringTestId.isEmpty() && m_testSeries.contains(m_currentMeasuringTestId)) {
+        QLineSeries *series = m_testSeries[m_currentMeasuringTestId];
+        if (series) {
+            // Calculate milliseconds since the first measurement
+            static qint64 firstTimestamp = 0;
+            if (firstTimestamp == 0) {
+                firstTimestamp = timestamp;
+            }
+            
+            qint64 msSinceStart = timestamp - firstTimestamp;
+            
+            // Get the test data to determine which pin to plot
+            QJsonObject currentTest;
+            for (const QJsonValue &groupValue : m_testGroups) {
+                QJsonObject group = groupValue.toObject();
+                QJsonArray tests = group["tests"].toArray();
+                for (const QJsonValue &testValue : tests) {
+                    QJsonObject test = testValue.toObject();
+                    if (test["id"].toString() == m_currentMeasuringTestId) {
+                        currentTest = test;
+                        break;
+                    }
+                }
+                if (!currentTest.isEmpty()) break;
+            }
+            
+            // Determine which voltage value to plot based on test.measure_pin
+            double voltageToPlot = a0; // default to A0
+            QString measurePin = currentTest["measurePin"].toString().toLower();
+            if (measurePin == "a1") {
+                voltageToPlot = a1;
+            } else if (measurePin == "a2") {
+                voltageToPlot = a2;
+            }
+            
+            qDebug() << "📊 Adding data point: ms=" << msSinceStart << "voltage=" << voltageToPlot << "from pin" << measurePin;
+            
+            // Add point to the series using milliseconds since start
+            series->append(msSinceStart, voltageToPlot);
+            
+            // Update the corresponding chart
+            QChart *chart = m_testCharts[m_currentMeasuringTestId];
+            if (chart) {
+                qDebug() << "📊 Updating chart with" << series->count() << "data points";
+                chart->update();
+                
+                // Force a repaint of the chart view
+                QChartView *chartView = qobject_cast<QChartView*>(chart->parent());
+                if (chartView) {
+                    chartView->repaint();
+                }
+            }
+        } else {
+            qDebug() << "⚠️ No series available for test ID:" << m_currentMeasuringTestId;
+        }
+    } else {
+        qDebug() << "⚠️ No current measuring test or no series available for ID:" << m_currentMeasuringTestId;
+    }
+}
+
+void TestWidget::handleMeasureRequest(const QJsonObject &test)
+{
+    qDebug() << "📊 Measure button clicked for measure voltage test:" << test["title"].toString();
+    
+    // Set this test as the current measuring test
+    m_currentMeasuringTestId = test["id"].toString();
+    qDebug() << "📊 Set current measuring test ID:" << m_currentMeasuringTestId;
+    
+    emit measureRequested(test);
+}
+
+

@@ -265,6 +265,14 @@ void MainWindow::initDock() {
   connect(m_testWidget, &TestWidget::blinkRequested, 
           m_blinkboardWidget, &BlinkBoardWidget::handleBlinkRequest);
 
+  // Connect TestWidget's measure request signal to BlinkBoardWidget's measure method
+  connect(m_testWidget, &TestWidget::measureRequested, 
+          m_blinkboardWidget, &BlinkBoardWidget::handleMeasureRequest);
+
+  // Connect BlinkBoardWidget's voltage data signal to TestWidget's voltage data handler
+  connect(m_blinkboardWidget, &BlinkBoardWidget::voltageDataReceived, 
+          m_testWidget, &TestWidget::handleVoltageDataReceived);
+
   // DebugDialog::debug("after creating bins");
   if (m_fileProgressDialog) {
     m_fileProgressDialog->setValue(89);

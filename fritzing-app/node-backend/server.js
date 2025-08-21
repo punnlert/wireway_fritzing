@@ -419,6 +419,22 @@ async function update_schematics(netlist) {
 
 function serial_port_on_data(data) {
   console.log("Serial port data:", data);
+  if (data.status === "ready") {
+    // TODO: send that the blinkboard is ready
+  } else if (data.ack === "analogRead") {
+    const analog_read_data = {
+      a0: data.A0 / 1000,
+      a1: data.A1 / 1000,
+      a2: data.A2 / 1000,
+    };
+    process.stdout.write(
+      JSON.stringify({
+        type: "analog_read_data",
+        data: JSON.stringify(analog_read_data),
+        timestamp: Date.now(),
+      }) + "\n"
+    );
+  }
 }
 
 function connect_serial_port(port_path) {
@@ -431,7 +447,7 @@ function connect_serial_port(port_path) {
     });
 
     blinkboard_serial_port.on("open", () => {
-      console.log("✅ Serial port opened successfully");
+      // console.log("✅ Serial port opened successfully");
       setTimeout(() => {
         init_blinkboard_sequence();
       }, 100);
@@ -494,7 +510,7 @@ function init_blinkboard_sequence() {
 function write_json_to_port(json) {
   if (!blinkboard_serial_port) return;
   const to_write = `${JSON.stringify(json)}\n`;
-  console.log("Writing to serial port:", to_write);
+  // console.log("Writing to serial port:", to_write);
   blinkboard_serial_port.write(to_write, (error) => {
     if (error) {
       console.error("❌ Error writing to serial port:", error.message);
@@ -515,7 +531,11 @@ function blink_row(row, pattern) {
 
 function blink_rows(rows, pattern) {
   rows.forEach((row) => {
-    blink_row(row, pattern);
+    write_json_to_port({
+      cmd: "setLed",
+      led: row,
+      pattern: pattern,
+    });
   });
 }
 
@@ -529,7 +549,21 @@ function blink_command_pin(pin, pattern) {
 
 function blink_command_pins(pins, pattern) {
   pins.forEach((pin) => {
-    blink_command_pin(pin, pattern);
+    write_json_to_port({
+      cmd: "setCmdLed",
+      led: pin,
+      pattern: pattern,
+    });
+  });
+}
+
+function request_voltage_data() {
+  write_json_to_port({
+    cmd: "reset",
+  });
+  write_json_to_port({
+    cmd: "analogRead",
+    sample: 5,
   });
 }
 
@@ -780,7 +814,7 @@ async function processCommand(command) {
           write_json_to_port({
             cmd: "reset",
           });
-        }, 10000);
+        }, 5000);
 
         return {
           status: "success",
@@ -790,6 +824,21 @@ async function processCommand(command) {
       } catch (error) {
         return createErrorResponse(error, 700); // Line number for blink_request
       }
+
+    case "request_voltage_data":
+      const voltage_data_interval = setInterval(() => {
+        request_voltage_data();
+      }, 500);
+
+      setTimeout(() => {
+        clearInterval(voltage_data_interval);
+      }, 10000);
+
+      return {
+        status: "success",
+        message: "Voltage data requested",
+        timestamp: Date.now(),
+      };
 
     case "add_test_group":
       // Add a new test group to the collection
