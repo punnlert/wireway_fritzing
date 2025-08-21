@@ -82,6 +82,9 @@ private:
     // Track which test is currently measuring
     QString m_currentMeasuringTestId;
     
+    // Track first timestamp for each measurement session
+    qint64 m_firstTimestamp;
+    
     // Backend connection
     QPushButton *m_connectButton;
     QPushButton *m_refreshTestsButton;

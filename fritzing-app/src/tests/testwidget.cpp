@@ -12,6 +12,7 @@ TestWidget::TestWidget(QWidget *parent)
     , m_voltageChartView(nullptr)
     , m_voltageSeries(nullptr)
     , m_voltageChart(nullptr)
+    , m_firstTimestamp(0)
 {
     setupUI();
     setupConnections();
@@ -472,12 +473,11 @@ void TestWidget::handleVoltageDataReceived(const QJsonObject &voltageData)
         QLineSeries *series = m_testSeries[m_currentMeasuringTestId];
         if (series) {
             // Calculate milliseconds since the first measurement
-            static qint64 firstTimestamp = 0;
-            if (firstTimestamp == 0) {
-                firstTimestamp = timestamp;
+            if (m_firstTimestamp == 0) {
+                m_firstTimestamp = timestamp;
             }
             
-            qint64 msSinceStart = timestamp - firstTimestamp;
+            qint64 msSinceStart = timestamp - m_firstTimestamp;
             
             // Get the test data to determine which pin to plot
             QJsonObject currentTest;
@@ -535,6 +535,26 @@ void TestWidget::handleMeasureRequest(const QJsonObject &test)
     // Set this test as the current measuring test
     m_currentMeasuringTestId = test["id"].toString();
     qDebug() << "📊 Set current measuring test ID:" << m_currentMeasuringTestId;
+    
+    // Clear previous data and reset the graph for this test
+    if (m_testSeries.contains(m_currentMeasuringTestId)) {
+        QLineSeries *series = m_testSeries[m_currentMeasuringTestId];
+        if (series) {
+            series->clear();
+            qDebug() << "📊 Cleared previous data for test:" << m_currentMeasuringTestId;
+            
+            // Update the chart to show the cleared state
+            QChart *chart = m_testCharts[m_currentMeasuringTestId];
+            if (chart) {
+                chart->update();
+                qDebug() << "📊 Chart cleared and updated for test:" << m_currentMeasuringTestId;
+            }
+        }
+    }
+    
+    // Reset the first timestamp for new measurement session
+    m_firstTimestamp = 0;
+    qDebug() << "📊 Reset timestamp for new measurement session";
     
     emit measureRequested(test);
 }
