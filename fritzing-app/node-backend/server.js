@@ -7,7 +7,6 @@ require("dotenv").config({ path: path.join(__dirname, ".env") });
 const { OpenAI } = require("openai");
 const { parseString } = require("xml2js");
 const { ReadlineParser } = require("@serialport/parser-readline");
-const yaml = require("yaml");
 const { spawn } = require("child_process");
 const { SerialPort } = require("serialport");
 const { EventEmitter } = require("events");
@@ -590,40 +589,84 @@ async function update_schematics(netlist) {
       }
     }
 
-    const rustProcess = spawn(rustBinaryPath, [processedXml]);
+    const rustProcess = spawn(rustBinaryPath, ["-y", "-x", processedXml]);
+    const rustProcessJson = spawn(rustBinaryPath, ["-x", processedXml]);
 
     let yamlOutput = "";
     let errorOutput = "";
 
+    let jsonOutput = "";
+    let errorOutputJson = "";
+
     rustProcess.stdout.on("data", (data) => {
       yamlOutput += data.toString();
+    });
+
+    rustProcessJson.stdout.on("data", (data) => {
+      jsonOutput += data.toString();
     });
 
     rustProcess.stderr.on("data", (data) => {
       errorOutput += data.toString();
     });
 
-    rustProcess.on("close", (code) => {
-      console.log(`Rust process exited with code ${code}`);
-      if (code === 0) {
+    rustProcessJson.stderr.on("data", (data) => {
+      errorOutputJson += data.toString();
+    });
+
+    // Track completion of both processes
+    let yamlCompleted = false;
+    let jsonCompleted = false;
+    let hasError = false;
+
+    // Function to check if both processes are complete
+    const checkCompletion = () => {
+      if (yamlCompleted && jsonCompleted && !hasError) {
         try {
-          // Parse the YAML output
-          console.log(yamlOutput);
-          const schematics = yamlOutput;
+          const schematics_yaml = yamlOutput;
+          const schematics_json = JSON.parse(jsonOutput);
           schematic_file_change = true;
-          resolve(schematics);
+          console.log("✅ Both Rust processes completed successfully");
+          resolve({ schematics_yaml, schematics_json });
         } catch (parseError) {
-          console.error("Error parsing YAML output:", parseError);
-          reject(new Error(`Failed to parse YAML: ${parseError.message}`));
+          console.error("Error processing outputs:", parseError);
+          reject(new Error(`Failed to process outputs: ${parseError.message}`));
         }
+      }
+    };
+
+    rustProcess.on("close", (code) => {
+      console.log(`YAML Rust process exited with code ${code}`);
+      if (code === 0) {
+        yamlCompleted = true;
+        checkCompletion();
       } else {
-        reject(new Error(`Rust process failed: ${errorOutput}`));
+        hasError = true;
+        reject(new Error(`YAML Rust process failed: ${errorOutput}`));
+      }
+    });
+
+    rustProcessJson.on("close", (code) => {
+      console.log(`JSON Rust process exited with code ${code}`);
+      if (code === 0) {
+        jsonCompleted = true;
+        checkCompletion();
+      } else {
+        hasError = true;
+        reject(new Error(`JSON Rust process failed: ${errorOutputJson}`));
       }
     });
 
     rustProcess.on("error", (error) => {
-      console.error("❌ Failed to start Rust process:", error);
-      reject(error);
+      console.error("❌ Failed to start YAML Rust process:", error);
+      hasError = true;
+      reject(new Error(`Failed to start YAML Rust process: ${error.message}`));
+    });
+
+    rustProcessJson.on("error", (error) => {
+      console.error("❌ Failed to start JSON Rust process:", error);
+      hasError = true;
+      reject(new Error(`Failed to start JSON Rust process: ${error.message}`));
     });
   });
 }
@@ -792,7 +835,7 @@ async function send_openai_message(message) {
   // console.log("schematic_file_change", schematic_file_change);
 
   if (schematic_file_change) {
-    const update_schematics = `this is the .yaml representation of the schematics \n ${schematics} \n `;
+    const update_schematics = `this is the .yaml representation of the schematics \n ${schematics.schematics_yaml} \n `;
 
     openai_chat_history.push({
       role: "developer",
@@ -821,6 +864,7 @@ async function send_openai_message(message) {
   };
 
   // console.log("create_param", create_param);
+  // console.log("chat_history", openai_chat_history);
 
   const response = await openai.responses.create(create_param);
 
@@ -1059,7 +1103,33 @@ async function processCommand(command) {
         console.log(
           `🔘 Received component highlight request for: ${component_title}`
         );
-        console.log(`Component ID: ${component_id}`);
+
+        for (const pin of schematics.schematics_json) {
+          for (const part of pin.parts) {
+            console.log("part", part.id);
+            if (part.id == Number(component_id)) {
+              if (pin.row < 51) {
+                write_json_to_port({
+                  cmd: "setLed",
+                  led: pin.row,
+                  pattern: "on",
+                });
+              } else if (pin.row === 51) {
+                write_json_to_port({
+                  cmd: "setCmdLed",
+                  led: "vcc",
+                  pattern: "on",
+                });
+              } else if (pin.row === 52) {
+                write_json_to_port({
+                  cmd: "setCmdLed",
+                  led: "gnd",
+                  pattern: "on",
+                });
+              }
+            }
+          }
+        }
 
         // Reset after highlighting
         setTimeout(() => {

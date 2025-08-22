@@ -8,4 +8,5 @@ clap = { version = "4.5.45", features = ["derive"] }
 minidom = "0.16.0"
 regex = "1.11.1"
 serde = { version= "1.0.219", features = ["derive"] }
+serde_json = "1.0"
 serde_yml = "0.0.12"

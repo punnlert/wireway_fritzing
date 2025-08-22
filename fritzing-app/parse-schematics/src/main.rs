@@ -19,6 +19,12 @@ use regex::Regex;
 
 #[derive(Debug, Parser)]
 struct XMLParser {
+    // if yaml is true, the output will be in yaml format
+    #[arg(short, long, default_value_t = false)]
+    yaml: bool,
+
+    // the xml string to parse
+    #[arg(short, long)]
     xml: String,
 }
 
@@ -33,7 +39,7 @@ struct Part {
     name: String,
     label: String,
     title: String,
-    // id: usize,
+    id: usize,
 }
 
 impl Pin {
@@ -50,12 +56,12 @@ impl Pin {
 }
 
 impl Part {
-    fn new(name: String, label: String, title: String) -> Self {
+    fn new(name: String, label: String, title: String, id: usize) -> Self {
         Self {
             name,
             label,
             title,
-            // id,
+            id,
         }
     }
 }
@@ -135,7 +141,7 @@ fn generate_net_pin(element: &Element, connections: &mut Vec<Pin>) {
                             connection_name.to_string(),
                             label.to_string(),
                             title.to_string(),
-                            // id.parse().expect("should be id"),
+                            part.attr("id").expect("should have id").parse().expect("should be usize"),
                         );
                         connected_part.insert(part);
                     }
@@ -162,7 +168,7 @@ fn get_extension_from_path(path: &PathBuf) -> Option<&str> {
     path.extension().and_then(|s| s.to_str())
 }
 
-fn parse_xml_string(xml_string: &String) {
+fn parse_xml_string_to_yaml(xml_string: &String) {
     let root: Result<minidom::Element> = xml_string.parse();
     match root {
         Ok(xml_element) => {
@@ -175,10 +181,29 @@ fn parse_xml_string(xml_string: &String) {
             for pin in connections.iter() {
                 let _unused = writeln!(
                     yaml,
-                    "{}",
+                    "{},",
                     serde_yml::to_string(&pin).expect("can't parse some pin")
                 );
             }
+
+        }
+        Err(xml_error) => {
+            println!("{}", xml_error);
+        }
+    }
+}
+
+fn parse_xml_string_to_json(xml_string: &String) {
+    let root: Result<minidom::Element> = xml_string.parse();
+    match root {
+        Ok(xml_element) => {
+            let mut connections = Vec::new();
+
+            generate_net_pin(&xml_element, &mut connections);
+
+            let mut json = std::io::stdout();
+
+            writeln!(json, "{}", serde_json::to_string(&connections).expect("can't parse some pin"));
         }
         Err(xml_error) => {
             println!("{}", xml_error);
@@ -191,7 +216,11 @@ fn main() {
 
     let xml_string = cli.xml;
 
-    parse_xml_string(&xml_string);
+    if cli.yaml {
+        parse_xml_string_to_yaml(&xml_string);
+    } else {
+        parse_xml_string_to_json(&xml_string);
+    }
 
     // if let Ok(path_exists) = fs::exists(&path) {
     //     if path_exists {
