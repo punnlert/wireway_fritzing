@@ -95,6 +95,11 @@ const tools = [
       properties: {
         title: { type: "string" },
         description: { type: "string" },
+        test_group_id: {
+          type: "string",
+          description:
+            "the id of the test group to add the test to. you must provide it every time for it to be added to the correct group. if you don't have any test group available, you can add a test group first by calling the add_test_group function",
+        },
         jsondata: {
           type: "object",
           properties: {
@@ -233,7 +238,7 @@ const tools = [
           additionalProperties: false,
         },
       },
-      required: ["title", "description", "jsondata"],
+      required: ["title", "description", "jsondata", "test_group_id"],
       additionalProperties: false,
     },
     strict: true,
@@ -248,6 +253,11 @@ const tools = [
       properties: {
         title: { type: "string" },
         description: { type: "string" },
+        test_group_id: {
+          type: "string",
+          description:
+            "the id of the test group to add the test to. you must provide it every time for it to be added to the correct group. if you don't have any test group available, you can add a test group first by calling the add_test_group function",
+        },
         jsondata: {
           type: "object",
           properties: {
@@ -262,7 +272,7 @@ const tools = [
           additionalProperties: false,
         },
       },
-      required: ["title", "description", "jsondata"],
+      required: ["title", "description", "jsondata", "test_group_id"],
       additionalProperties: false,
     },
     strict: true,
@@ -280,6 +290,11 @@ const tools = [
           type: "string",
           description:
             "this should explain the reason why you administered this test",
+        },
+        test_group_id: {
+          type: "string",
+          description:
+            "the id of the test group to add the test to. you must provide it every time for it to be added to the correct group. if you don't have any test group available, you can add a test group first by calling the add_test_group function",
         },
         jsondata: {
           type: "object",
@@ -301,19 +316,50 @@ const tools = [
           additionalProperties: false,
         },
       },
-      required: ["title", "description", "jsondata"],
+      required: ["title", "description", "jsondata", "test_group_id"],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    type: "function",
+    name: "add_test_group",
+    description:
+      "Adding a test group. One test group should have only one goal that you want to prove. Must be called before adding any test.",
+    parameters: {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        description: { type: "string" },
+      },
+      required: ["title", "description"],
       additionalProperties: false,
     },
     strict: true,
   },
 ];
 
-function add_self_observe_test({ title, description, jsondata }) {
+function add_self_observe_test({
+  title,
+  description,
+  jsondata,
+  test_group_id,
+}) {
   // console.log("add_self_observe_test", title, description, jsondata);
 
   // Find the latest test group and add the new test
   if (testGroups.length > 0) {
-    const latestGroupIndex = testGroups.length - 1;
+    const groupIndex = testGroups.findIndex(
+      (group) => group.id === test_group_id
+    );
+
+    if (groupIndex === -1) {
+      console.log("❌ Test group not found");
+      return {
+        successfully_added: false,
+        error: "Test group not found",
+      };
+    }
 
     const newTest = {
       id: Date.now().toString(),
@@ -326,25 +372,46 @@ function add_self_observe_test({ title, description, jsondata }) {
       completed: false,
     };
 
-    testGroups[latestGroupIndex].tests.push(newTest);
+    testGroups[groupIndex].tests.push(newTest);
 
     console.log(
-      `✅ Added self observation test "${title}" to group "${testGroups[latestGroupIndex].title}"`
+      `✅ Added self observation test "${title}" to group "${testGroups[groupIndex].title}"`
     );
 
-    return newTest.id;
+    return {
+      successfully_added: true,
+      error: null,
+    };
   } else {
     console.log("❌ No test groups available to add test to");
-    return null;
+    return {
+      successfully_added: false,
+      error: "No test groups available to add test to",
+    };
   }
 }
 
-function add_measure_voltage_test({ title, description, jsondata }) {
+function add_measure_voltage_test({
+  title,
+  description,
+  jsondata,
+  test_group_id,
+}) {
   // console.log("add_measure_voltage_test", title, description, jsondata);
 
   // Find the latest test group and add the new test
   if (testGroups.length > 0) {
-    const latestGroupIndex = testGroups.length - 1;
+    const groupIndex = testGroups.findIndex(
+      (group) => group.id === test_group_id
+    );
+
+    if (groupIndex === -1) {
+      console.log("❌ Test group not found");
+      return {
+        successfully_added: false,
+        error: "Test group not found",
+      };
+    }
 
     // Create new test object
     const newTest = {
@@ -360,23 +427,48 @@ function add_measure_voltage_test({ title, description, jsondata }) {
     };
 
     // Add test to the latest group
-    testGroups[latestGroupIndex].tests.push(newTest);
+    testGroups[groupIndex].tests.push(newTest);
 
     console.log(
-      `✅ Added measure voltage test "${title}" to group "${testGroups[latestGroupIndex].title}"`
+      `✅ Added measure voltage test "${title}" to group "${testGroups[groupIndex].title}"`
     );
+
+    return {
+      successfully_added: true,
+      error: null,
+    };
   } else {
     console.log(
       "⚠️ No test groups available. Cannot add measure voltage test."
     );
+
+    return {
+      successfully_added: false,
+      error: "No test groups available to add test to",
+    };
   }
 }
 
-function add_switch_connection_suggestion({ title, description, jsondata }) {
+function add_switch_connection_suggestion({
+  title,
+  description,
+  jsondata,
+  test_group_id,
+}) {
   console.log("add_switch_connection_suggestion", title, description, jsondata);
 
   if (testGroups.length > 0) {
-    const latestGroupIndex = testGroups.length - 1;
+    const groupIndex = testGroups.findIndex(
+      (group) => group.id === test_group_id
+    );
+
+    if (groupIndex === -1) {
+      console.log("❌ Test group not found");
+      return {
+        successfully_added: false,
+        error: "Test group not found",
+      };
+    }
 
     // Create new test object
     const newTest = {
@@ -391,16 +483,41 @@ function add_switch_connection_suggestion({ title, description, jsondata }) {
     };
 
     // Add test to the latest group
-    testGroups[latestGroupIndex].tests.push(newTest);
+    testGroups[groupIndex].tests.push(newTest);
 
     console.log(
-      `✅ Added measure voltage test "${title}" to group "${testGroups[latestGroupIndex].title}"`
+      `✅ Added measure voltage test "${title}" to group "${testGroups[groupIndex].title}"`
     );
+
+    return {
+      successfully_added: true,
+      error: null,
+    };
   } else {
     console.log(
       "⚠️ No test groups available. Cannot add measure voltage test."
     );
+
+    return {
+      successfully_added: false,
+      error: "No test groups available to add test to",
+    };
   }
+}
+
+function add_test_group({ title, description }) {
+  const id = crypto.randomUUID();
+  testGroups.push({
+    id,
+    title: title,
+    description: description,
+    tests: [],
+  });
+  return {
+    successfully_added: true,
+    test_group_id: id,
+    error: null,
+  };
 }
 
 class EventHandler extends EventEmitter {
@@ -412,9 +529,9 @@ class EventHandler extends EventEmitter {
 
   async onEvent(event) {
     try {
-      console.log(event);
       // Retrieve events that are denoted with 'requires_action'
       // since these will have our tool_calls
+      console.log(event.type);
       if (event.type === "response.output_item.added") {
         if (event.item.type === "message" || event.item.type === "reasoning") {
           process.stdout.write(
@@ -435,31 +552,26 @@ class EventHandler extends EventEmitter {
         }
       } else if (event.type === "response.completed") {
         event.response.output.forEach((output) => {
-          if (output.type === "message") {
-            openai_chat_history = [
-              ...openai_chat_history,
-              { role: "assistant", content: output.content[0].text },
-            ];
-          } else {
-            openai_chat_history = [...openai_chat_history, output];
-          }
+          openai_chat_history = [...openai_chat_history, output];
         });
 
         const function_calls = event.response.output.filter(
           (output) => output.type === "function_call"
         );
-        console.log("function_calls", function_calls);
+
+        // console.log("function_calls", function_calls);
+        console.log(event);
 
         if (function_calls.length > 0) {
           const set_count = testGroups.length + 1;
 
-          testGroups.push({
-            id: Date.now().toString(),
-            title: `Debug ${set_count}`,
-            description: `Debug ${set_count}`,
-            tests: [],
-          });
-          console.log("testGroups", testGroups);
+          // testGroups.push({
+          //   id: Date.now().toString(),
+          //   title: `Debug ${set_count}`,
+          //   description: `Debug ${set_count}`,
+          //   tests: [],
+          // });
+          // console.log("testGroups", testGroups);
           this.handle_function_calls(function_calls);
           process.stdout.write(
             JSON.stringify({
@@ -500,48 +612,62 @@ class EventHandler extends EventEmitter {
         if (response.type === "function_call") {
           console.log(response);
           if (response.name === "add_self_observe_test") {
-            const { title, description } = JSON.parse(response.arguments);
+            const { title, description, test_group_id } = JSON.parse(
+              response.arguments
+            );
             const jsondata = { field: undefined };
-            const test_key = add_self_observe_test({
+            const result = add_self_observe_test({
               title,
               description,
               jsondata,
+              test_group_id,
             });
 
             openai_chat_history.push({
               type: "function_call_output",
               call_id: response.call_id,
-              output: JSON.stringify({ test_key, successfully_added: true }),
+              output: JSON.stringify(result),
             });
           } else if (response.name === "add_measure_voltage_test") {
-            const { title, description, jsondata } = JSON.parse(
+            const { title, description, jsondata, test_group_id } = JSON.parse(
               response.arguments
             );
-            const test_key = add_measure_voltage_test({
+            const result = add_measure_voltage_test({
               title,
               description,
               jsondata,
+              test_group_id,
             });
 
             openai_chat_history.push({
               type: "function_call_output",
               call_id: response.call_id,
-              output: JSON.stringify({ test_key, successfully_added: true }),
+              output: JSON.stringify(result),
             });
           } else if (response.name === "add_switch_connection_suggestion") {
-            const { title, description, jsondata } = JSON.parse(
+            const { title, description, jsondata, test_group_id } = JSON.parse(
               response.arguments
             );
-            const test_key = add_switch_connection_suggestion({
+            const result = add_switch_connection_suggestion({
               title,
               description,
               jsondata,
+              test_group_id,
             });
 
             openai_chat_history.push({
               type: "function_call_output",
               call_id: response.call_id,
-              output: JSON.stringify({ test_key, successfully_added: true }),
+              output: JSON.stringify(result),
+            });
+          } else if (response.name === "add_test_group") {
+            const { title, description } = JSON.parse(response.arguments);
+            const result = add_test_group({ title, description });
+
+            openai_chat_history.push({
+              type: "function_call_output",
+              call_id: response.call_id,
+              output: JSON.stringify(result),
             });
           }
         }
