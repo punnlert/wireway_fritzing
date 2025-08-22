@@ -774,6 +774,61 @@ void ItemBase::mousePressEvent(QGraphicsSceneMouseEvent *event) {
 		componentData["component_id"] = QString::number(m_id);
 		componentData["component_title"] = title();
 		
+		// Get actual breadboard pin connections
+		QJsonArray pinsArray;
+		const QList<ConnectorItem *> &connectors = cachedConnectorItems();
+		
+		// qDebug() << "=== BREADBOARD CONNECTION DEBUG ===";
+		// qDebug() << "Total connectors found:" << connectors.count();
+		
+		if (connectors.count() > 0) {
+			foreach (ConnectorItem *connector, connectors) {
+				if (connector) {
+					// qDebug() << "--- Connector ---";
+					// qDebug() << "  Connector ID:" << connector->connectorSharedID();
+					// qDebug() << "  Connector Name:" << connector->connectorSharedName();
+					// qDebug() << "  Is Connected:" << (connector->connectionsCount() > 0);
+					// qDebug() << "  Connection Count:" << connector->connectionsCount();
+					
+					// Get the actual connections to find breadboard pins
+					if (connector->connectionsCount() > 0) {
+						// qDebug() << "  Connected to:";
+						foreach (ConnectorItem *connectedConnector, connector->connectedToItems()) {
+							if (connectedConnector) {
+								ItemBase *connectedItem = connectedConnector->attachedTo();
+								if (connectedItem) {
+									// qDebug() << "    Item:" << connectedItem->title();
+									// qDebug() << "    View ID:" << connectedItem->viewID();
+									
+									// Check if this is connected to a breadboard
+									if (connectedItem->viewID() == ViewLayer::BreadboardView) {
+										// qDebug() << "    *** CONNECTED TO BREADBOARD ***";
+										
+										// Get the breadboard pin information
+										// This would be the actual pin number on the breadboard
+										QString pinInfo = QString("%1").arg(connectedConnector->connectorSharedID());
+										pinsArray.append(pinInfo);
+										// qDebug() << "    Added breadboard pin:" << pinInfo;
+									}
+								}
+							}
+						}
+					} else {
+						// qDebug() << "  No connections found";
+					}
+				} else {
+					// qDebug() << "--- Null connector found ---";
+				}
+			}
+		} else {
+			// qDebug() << "No connectors found for this component";
+		}
+		
+		// qDebug() << "Final breadboard pins array:" << pinsArray;
+		// qDebug() << "=== END BREADBOARD CONNECTION DEBUG ===";
+		
+		componentData["pins"] = pinsArray;
+		
 		// Emit signal through InfoGraphicsView to MainWindow
 		if (infoGraphicsView) {
 			QWidget *parent = qobject_cast<QWidget*>(infoGraphicsView->parent());

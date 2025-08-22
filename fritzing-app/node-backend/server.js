@@ -1099,43 +1099,107 @@ async function processCommand(command) {
 
     case "component_highlight":
       try {
-        const { component_id, component_title, timestamp } = command;
+        const { component_id, component_title, timestamp, pins } = command;
         console.log(
           `🔘 Received component highlight request for: ${component_title}`
         );
+        console.log("pins", pins);
+        let leds = [];
 
-        for (const pin of schematics.schematics_json) {
-          for (const part of pin.parts) {
-            console.log("part", part.id);
-            if (part.id == Number(component_id)) {
-              if (pin.row < 51) {
+        for (const pin of pins) {
+          // INSERT_YOUR_CODE
+          // Only process pins that match the format 'pin[num][row]' where num is 1-50 and row is A-H or J
+          // Example: 'pin12A', 'pin3B', etc.
+          const pinMatch = /^pin([1-9]|[1-4][0-9]|50)([A-Z])$/.exec(pin);
+          if (pinMatch) {
+            const rowNum = Number(pinMatch[1]);
+            const rowLetter = pinMatch[2];
+
+            console.log("rowNum", rowNum);
+            console.log("rowLetter", rowLetter);
+
+            if (rowNum >= 1 && rowNum <= 50) {
+              if (rowLetter >= "A" && rowLetter <= "E") {
+                if (rowNum <= 25) {
+                  leds.push(rowNum);
+                  write_json_to_port({
+                    cmd: "setLed",
+                    led: rowNum,
+                    pattern: "on",
+                  });
+                }
+              } else if (rowLetter >= "F" && rowLetter <= "H") {
+                leds.push(rowNum + 25);
                 write_json_to_port({
                   cmd: "setLed",
-                  led: pin.row,
-                  pattern: "on",
-                });
-              } else if (pin.row === 51) {
-                write_json_to_port({
-                  cmd: "setCmdLed",
-                  led: "vcc",
-                  pattern: "on",
-                });
-              } else if (pin.row === 52) {
-                write_json_to_port({
-                  cmd: "setCmdLed",
-                  led: "gnd",
+                  led: rowNum + 25,
                   pattern: "on",
                 });
               }
             }
+            if (rowLetter == "W" || rowLetter == "Y") {
+              leds.push("vcc");
+              write_json_to_port({
+                cmd: "setCmdLed",
+                led: "vcc",
+                pattern: "on",
+              });
+            } else if (rowLetter == "X" || rowLetter == "Z") {
+              leds.push("gnd");
+              write_json_to_port({
+                cmd: "setCmdLed",
+                led: "gnd",
+                pattern: "on",
+              });
+            }
           }
         }
+        // for (const pin of schematics.schematics_json) {
+        //   for (const part of pin.parts) {
+        //     console.log("part", part.id);
+        //     if (part.id == Number(component_id)) {
+        //       if (pin.row < 51) {
+        //         write_json_to_port({
+        //           cmd: "setLed",
+        //           led: pin.row,
+        //           pattern: "on",
+        //         });
+        //       } else if (pin.row === 51) {
+        //         write_json_to_port({
+        //           cmd: "setCmdLed",
+        //           led: "vcc",
+        //           pattern: "on",
+        //         });
+        //       } else if (pin.row === 52) {
+        //         write_json_to_port({
+        //           cmd: "setCmdLed",
+        //           led: "gnd",
+        //           pattern: "on",
+        //         });
+        //       }
+        //     }
+        //   }
+        // }
 
         // Reset after highlighting
         setTimeout(() => {
-          write_json_to_port({
-            cmd: "reset",
-          });
+          if (leds.length > 0) {
+            for (const led of leds) {
+              if (led === "vcc" || led === "gnd") {
+                write_json_to_port({
+                  cmd: "setCmdLed",
+                  led: led,
+                  pattern: "off",
+                });
+              } else {
+                write_json_to_port({
+                  cmd: "setLed",
+                  led: led,
+                  pattern: "off",
+                });
+              }
+            }
+          }
         }, 3000); // Shorter duration for component highlighting
 
         return {

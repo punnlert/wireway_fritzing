@@ -951,6 +951,7 @@ void BlinkBoardWidget::handleComponentHighlighted(const QJsonObject& componentDa
   // Create the component highlight command
   QJsonObject jsonCommand;
   jsonCommand["command"] = "component_highlight";
+  jsonCommand["pins"] = componentData["pins"];
   jsonCommand["component_id"] = componentData["component_id"];
   jsonCommand["component_title"] = componentData["component_title"];
   jsonCommand["timestamp"] = QDateTime::currentMSecsSinceEpoch();
