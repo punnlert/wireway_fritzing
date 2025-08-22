@@ -40,6 +40,11 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include <QClipboard>
 #include <QScrollBar>
 #include <QStatusBar>
+#include <QJsonObject>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QDateTime>
+#include <QMetaObject>
 
 #include <limits>
 
@@ -722,7 +727,7 @@ ItemBase * SketchWidget::addItem(ModelPart * modelPart, ViewLayer::ViewLayerPlac
 		else {
 			modelPart = mp;
 		}
-		if (!modelPart) return nullptr;
+		if (!modelPart) return nullptr;   // this is very fucked up
 
 		newItem = addItemAux(modelPart, viewLayerPlacement, viewGeometry, id, true, m_viewID, false);
 	}
@@ -1188,7 +1193,14 @@ bool isVirtualWireConnector(ConnectorItem * toConnectorItem) {
 void SketchWidget::deleteMiddle(QSet<ItemBase *> & deletedItems, QUndoCommand * parentCommand) {
 	foreach (ItemBase * itemBase, deletedItems) {
 		foreach (ConnectorItem * fromConnectorItem, itemBase->cachedConnectorItems()) {
-			foreach (ConnectorItem * toConnectorItem, fromConnectorItem->connectedToItems()) {
+			QList<ConnectorItem *> connectorItems;
+			foreach (ConnectorItem * ci, fromConnectorItem->connectedToItems()) connectorItems << ci;
+			ConnectorItem * crossConnectorItem = fromConnectorItem->getCrossLayerConnectorItem();
+			if (crossConnectorItem) {
+				foreach (ConnectorItem * ci, crossConnectorItem->connectedToItems()) connectorItems << ci;
+			}
+
+			foreach (ConnectorItem * toConnectorItem, connectorItems) {
 				extendChangeConnectionCommand(BaseCommand::CrossView, fromConnectorItem, toConnectorItem,
 				                              ViewLayer::specFromID(fromConnectorItem->attachedToViewLayerID()),
 				                              false, parentCommand);
@@ -5710,6 +5722,8 @@ void SketchWidget::hoverEnterItem(QGraphicsSceneHoverEvent * event, ItemBase * i
 	if(m_infoViewOnHover || currentlyInfoviewed(item)) {
 		InfoGraphicsView::hoverEnterItem(event, item);
 	}
+
+
 
 	Wire * wire = dynamic_cast<Wire *>(item);
 	if (wire) {

@@ -3200,3 +3200,8 @@ void MainWindow::noSchematicConversion() {
 void MainWindow::setInitialTab(int tab) {
 	m_initialTab = tab;
 }
+
+void MainWindow::handleBreadboardComponentHighlighted(const QJsonObject& componentData) {
+	// Emit the signal to the BlinkBoardWidget
+	emit breadboardComponentHighlighted(componentData);
+}

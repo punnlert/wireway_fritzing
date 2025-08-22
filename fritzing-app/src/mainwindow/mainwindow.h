@@ -261,6 +261,7 @@ signals:
   void mainWindowMoved(QWidget *);
   void changeActivationSignal(bool activate, QWidget *originator);
   void externalProcessSignal(QString &name, QString &path, QStringList &args);
+  void breadboardComponentHighlighted(const QJsonObject& componentData);
 
 public slots:
   void ensureClosable();
@@ -289,6 +290,7 @@ public slots:
   void setGroundFillKeepout();
   void oldSchematicsSlot(const QString &filename, bool &useOldSchematics);
   void showWelcomeView();
+  void handleBreadboardComponentHighlighted(const QJsonObject& componentData);
 
 protected slots:
   void mainLoad();

@@ -273,6 +273,10 @@ void MainWindow::initDock() {
   connect(m_blinkboardWidget, &BlinkBoardWidget::voltageDataReceived, 
           m_testWidget, &TestWidget::handleVoltageDataReceived);
 
+  // Connect MainWindow's component highlighting signal to BlinkBoardWidget
+  connect(this, &MainWindow::breadboardComponentHighlighted,
+          m_blinkboardWidget, &BlinkBoardWidget::handleComponentHighlighted);
+
   // DebugDialog::debug("after creating bins");
   if (m_fileProgressDialog) {
     m_fileProgressDialog->setValue(89);

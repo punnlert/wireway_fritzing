@@ -1053,6 +1053,31 @@ async function processCommand(command) {
         return createErrorResponse(error, 700); // Line number for blink_request
       }
 
+    case "component_highlight":
+      try {
+        const { component_id, component_title, timestamp } = command;
+        console.log(
+          `🔘 Received component highlight request for: ${component_title}`
+        );
+        console.log(`Component ID: ${component_id}`);
+
+        // Reset after highlighting
+        setTimeout(() => {
+          write_json_to_port({
+            cmd: "reset",
+          });
+        }, 3000); // Shorter duration for component highlighting
+
+        return {
+          status: "success",
+          message: `Component highlight processed for: ${component_title}`,
+          pins_highlighted: 1,
+          timestamp: Date.now(),
+        };
+      } catch (error) {
+        return createErrorResponse(error, 800); // Line number for component_highlight
+      }
+
     case "request_voltage_data":
       const voltage_data_interval = setInterval(() => {
         request_voltage_data();

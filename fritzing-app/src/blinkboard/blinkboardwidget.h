@@ -37,6 +37,7 @@ public slots:
   void submitTestResultsToBackend(const QString &groupId, const QJsonObject &results);
   void handleBlinkRequest(const QJsonObject &test, const QString &action);
   void handleMeasureRequest(const QJsonObject &test);
+  void handleComponentHighlighted(const QJsonObject& componentData);
 
 signals:
   void testsReceived(const QJsonArray &tests);

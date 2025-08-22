@@ -40,6 +40,7 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include "../utils/clickablelabel.h"
 #include "../utils/familypropertycombobox.h"
 #include "../referencemodel/referencemodel.h"
+#include "../mainwindow/mainwindow.h"
 
 #include <QScrollBar>
 #include <QTimer>
@@ -51,6 +52,11 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include <QApplication>
 #include <QClipboard>
 #include <qmath.h>
+#include <QJsonObject>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QDateTime>
+#include <QMetaObject>
 
 /////////////////////////////////
 
@@ -577,9 +583,6 @@ void ItemBase::hoverEnterEvent ( QGraphicsSceneHoverEvent * event ) {
 	m_hoverCount++;
 	//debugInfo(QString("inc hover %1").arg(m_hoverCount));
 	hoverUpdate();
-	if (infoGraphicsView) {
-		infoGraphicsView->hoverEnterItem(event, this);
-	}
 }
 
 void ItemBase::hoverLeaveEvent ( QGraphicsSceneHoverEvent * event ) {
@@ -762,6 +765,29 @@ void ItemBase::mousePressEvent(QGraphicsSceneMouseEvent *event) {
 	if (infoGraphicsView && infoGraphicsView->spaceBarIsPressed()) {
 		event->ignore();
 		return;
+	}
+
+	// Check if this is a breadboard component being clicked
+	if (m_viewID == ViewLayer::BreadboardView) {
+		// Get breadboard pin information and emit signal
+		QJsonObject componentData;
+		componentData["component_id"] = QString::number(m_id);
+		componentData["component_title"] = title();
+		
+		// Emit signal through InfoGraphicsView to MainWindow
+		if (infoGraphicsView) {
+			QWidget *parent = qobject_cast<QWidget*>(infoGraphicsView->parent());
+			while (parent && !qobject_cast<MainWindow*>(parent)) {
+				parent = qobject_cast<QWidget*>(parent->parent());
+			}
+			
+			if (MainWindow *mainWindow = qobject_cast<MainWindow*>(parent)) {
+				// Use QMetaObject::invokeMethod to safely emit the signal from a different thread
+				QMetaObject::invokeMethod(mainWindow, "handleBreadboardComponentHighlighted",
+										Qt::QueuedConnection,
+										Q_ARG(QJsonObject, componentData));
+			}
+		}
 	}
 
 	//scene()->setItemIndexMethod(QGraphicsScene::NoIndex);

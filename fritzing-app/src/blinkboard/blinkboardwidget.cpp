@@ -912,3 +912,54 @@ void BlinkBoardWidget::handleAnalogReadData(const QJsonObject &event)
     emit voltageDataReceived(voltageData);
   }
 }
+
+void BlinkBoardWidget::handleComponentHighlighted(const QJsonObject& componentData) {
+  qDebug() << "=== COMPONENT HIGHLIGHT DATA RECEIVED ===";
+  qDebug() << "Raw JSON data:" << componentData;
+  
+  // // Log each field individually
+  // if (componentData.contains("component_id")) {
+  //   qDebug() << "Component ID:" << componentData["component_id"].toString();
+  // }
+  
+  // if (componentData.contains("component_title")) {
+  //   qDebug() << "Component Title:" << componentData["component_title"].toString();
+  // }
+  
+  // if (componentData.contains("pins")) {
+  //   QJsonArray pins = componentData["pins"].toArray();
+  //   qDebug() << "Number of pins:" << pins.size();
+  //   qDebug() << "Pins array:" << pins;
+    
+  //   // Log each pin individually
+  //   for (int i = 0; i < pins.size(); ++i) {
+  //     qDebug() << "Pin" << i << ":" << pins[i].toString();
+  //   }
+  // }
+  
+  // // Log any other fields that might be present
+  // QStringList keys = componentData.keys();
+  // qDebug() << "All available keys:" << keys;
+  
+  // qDebug() << "=== END COMPONENT HIGHLIGHT DATA ===";
+
+  // if (m_nodeProcess->state() != QProcess::Running) {
+  //   qDebug() << "Cannot send component highlight - Node.js process not running";
+  //   return;
+  // }
+
+  // Create the component highlight command
+  QJsonObject jsonCommand;
+  jsonCommand["command"] = "component_highlight";
+  jsonCommand["component_id"] = componentData["component_id"];
+  jsonCommand["component_title"] = componentData["component_title"];
+  jsonCommand["timestamp"] = QDateTime::currentMSecsSinceEpoch();
+  
+  QJsonDocument doc(jsonCommand);
+  QString jsonString = doc.toJson(QJsonDocument::Compact);
+  
+  qDebug() << "Sending component highlight to Node.js:" << jsonString;
+  
+  // Send to Node.js backend
+  m_nodeProcess->write(jsonString.toUtf8() + "\n");
+}
