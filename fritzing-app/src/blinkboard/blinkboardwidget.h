@@ -17,6 +17,9 @@
 #include <QLabel>
 #include <QDialog>
 #include <QComboBox>
+#include <QVariant>
+#include <QWidget>
+#include <QObject>
 
 class BlinkBoardWidget : public QScrollArea {
   Q_OBJECT
@@ -78,6 +81,10 @@ protected:
   QPushButton *m_updateSchematicsButton;
   QHBoxLayout *m_inputLayout;
   
+  // Highlighted components storage
+  QJsonArray m_highlightedComponents;
+  QLabel *m_highlightedComponentsLabel;
+  
   // Loading indicator for AI responses
   void startNodeBackend();
   void sendCommandToNode(const QString &command);
@@ -98,6 +105,17 @@ protected:
   
   // Test handling
   void handleTestsReceived(const QJsonArray &tests);
+  
+  // Highlighted components management
+  void addHighlightedComponent(const QJsonObject& componentData);
+  void removeHighlightedComponent(const QString& componentId);
+  void clearHighlightedComponents();
+  void refreshHighlightedComponents();
+  QJsonArray getHighlightedComponents() const;
+  void updateHighlightedComponentsDisplay();
+  
+  // Modified chat message handling
+  void handleSendMessageWithContext();
   void handleAnalogReadData(const QJsonObject &event);
 };
 #endif

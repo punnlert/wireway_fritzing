@@ -41,6 +41,8 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include "../utils/familypropertycombobox.h"
 #include "../referencemodel/referencemodel.h"
 #include "../mainwindow/mainwindow.h"
+#include "breadboard.h"
+#include "wire.h"
 
 #include <QScrollBar>
 #include <QTimer>
@@ -2768,6 +2770,11 @@ QJsonArray ItemBase::collectMultipleBreadboardComponentsData(const QList<QGraphi
 	foreach (QGraphicsItem *item, selectedItems) {
 		ItemBase *itemBase = dynamic_cast<ItemBase *>(item);
 		if (!itemBase || itemBase->viewID() != ViewLayer::BreadboardView) {
+			continue;
+		}
+		
+		// Skip breadboards and wires - only include actual electronic components
+		if (dynamic_cast<Breadboard*>(itemBase) || dynamic_cast<Wire*>(itemBase)) {
 			continue;
 		}
 		

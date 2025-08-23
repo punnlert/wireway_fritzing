@@ -1430,24 +1430,48 @@ async function processCommand(command) {
         );
       }
 
-    default:
-      // Check if it's a chat message
-      if (cmd.startsWith("chat:")) {
-        const message = cmd.substring(5); // Remove "chat:" prefix
+    case "chat":
+      try {
+        const { message, highlighted_components } = command;
         console.log(`Chat message received: ${message}`);
 
-        let query_text = `${message} \n Add any tests or suggestions if necessary. You can explain the test in your reply but you don't have to mention some trivial details like test_key`;
-        const response = await send_openai_message(query_text);
-        // // Echo the message back (you can add more sophisticated chat logic here)
-        // return {
-        //   type: "chat",
-        //   message: `${response}`,
-        //   timestamp: Date.now(),
-        // };
+        // Check if highlighted components are provided
+        if (
+          highlighted_components &&
+          highlighted_components !== undefined &&
+          highlighted_components.length > 0
+        ) {
+          console.log(`Highlighted components:`, highlighted_components);
+
+          // Create context string from highlighted components
+          let contextString = `\n\nContext - Highlighted Components:\n`;
+          highlighted_components.forEach((component, index) => {
+            const title = component.component_title || component.component_id;
+            const pins = component.pins ? component.pins.join(", ") : "No pins";
+            contextString += `${index + 1}. ${title} (ID: ${
+              component.component_id
+            }) - Pins: ${pins}\n`;
+          });
+
+          let query_text = `${message}${contextString}\n\nAdd any tests or suggestions if necessary. You can explain the test in your reply but you don't have to mention some trivial details like test_key`;
+          // const response = await send_openai_message(query_text);
+        } else {
+          // No highlighted components, send regular chat message
+          console.log(`No highlighted components provided`);
+
+          let query_text = `${message} \n Add any tests or suggestions if necessary. You can explain the test in your reply but you don't have to mention some trivial details like test_key`;
+          // const response = await send_openai_message(query_text);
+        }
+
         return;
+      } catch (error) {
+        return createErrorResponse(error, 950); // Line number for chat
       }
 
-      return createErrorResponse(new Error(`Unknown command: ${cmd}`), 435);
+    default:
+      // No matching command found
+      console.log(`Unknown command: ${cmd}`);
+      return createErrorResponse(new Error(`Unknown command: ${cmd}`), 999);
   }
 }
 

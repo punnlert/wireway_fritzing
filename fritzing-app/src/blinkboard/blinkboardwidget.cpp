@@ -154,6 +154,21 @@ BlinkBoardWidget::BlinkBoardWidget(QWidget *parent)
   
   // Add chat interface at the top
   m_mainLayout->addWidget(m_chatDisplay);
+  
+  // Add help text for highlighted components
+  QLabel *helpLabel = new QLabel("💡 Highlight electronic components (resistors, LEDs, etc.) in the breadboard view to include them as context in your chat messages. Highlighted components are automatically included when you send a message.");
+  helpLabel->setStyleSheet("QLabel { color: #666; font-style: italic; padding: 5px; background-color: #f9f9f9; border: 1px solid #e0e0e0; border-radius: 3px; font-family: 'Droid Sans'; font-size: 9px; }");
+  helpLabel->setWordWrap(true);
+  helpLabel->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+  m_mainLayout->addWidget(helpLabel);
+  
+  // Add highlighted components display
+  m_highlightedComponentsLabel = new QLabel("No components highlighted");
+  m_highlightedComponentsLabel->setStyleSheet("QLabel { color: #777777; font-style: italic; padding: 5px; background-color: #f5f5f5; border: 1px solid #ddd; border-radius: 3px; font-family: 'Droid Sans'; font-size: 10px; }");
+  m_highlightedComponentsLabel->setWordWrap(true);
+  m_highlightedComponentsLabel->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+  m_mainLayout->addWidget(m_highlightedComponentsLabel);
+  
   m_mainLayout->addLayout(m_inputLayout);
   
   // Add separator - match Fritzing separator style
@@ -429,7 +444,32 @@ void BlinkBoardWidget::handleSendMessage() {
   
   // Send message to Node.js backend if connected
   if (m_nodeProcess->state() == QProcess::Running) {
-    sendCommandToNode("chat:" + message);
+    // Always send "chat" command, with highlighted components
+    QJsonObject chatMessage;
+    chatMessage["command"] = "chat";
+    chatMessage["message"] = message;
+    chatMessage["timestamp"] = QDateTime::currentMSecsSinceEpoch();
+    
+    // Include highlighted components if they exist
+    if (!m_highlightedComponents.isEmpty()) {
+      chatMessage["highlighted_components"] = m_highlightedComponents;
+      
+      qDebug() << "Sending chat message with highlighted components context:" << m_highlightedComponents.size() << "components";
+      
+      // Clear highlighted components after sending (they've been used as context)
+      clearHighlightedComponents();
+    } else {
+      // Send without highlighted components
+      chatMessage["highlighted_components"] = QJsonValue::Undefined;
+      qDebug() << "Sending chat message without highlighted components context";
+    }
+    
+    QJsonDocument doc(chatMessage);
+    QString jsonString = doc.toJson(QJsonDocument::Compact);
+    
+    qDebug() << "Sending chat message to Node.js:" << jsonString.left(200) + "...";
+    m_nodeProcess->write(jsonString.toUtf8() + "\n");
+    
   } else {
     addChatMessage("Not connected to backend. Please connect first.", false);
   }
@@ -917,52 +957,12 @@ void BlinkBoardWidget::handleComponentHighlighted(const QJsonObject& componentDa
   qDebug() << "=== COMPONENT HIGHLIGHT DATA RECEIVED ===";
   qDebug() << "Raw JSON data:" << componentData;
   
-  // // Log each field individually
-  // if (componentData.contains("component_id")) {
-  //   qDebug() << "Component ID:" << componentData["component_id"].toString();
-  // }
+  // Store the highlighted component locally instead of sending to backend immediately
+  addHighlightedComponent(componentData);
   
-  // if (componentData.contains("component_title")) {
-  //   qDebug() << "Component Title:" << componentData["component_title"].toString();
-  // }
-  
-  // if (componentData.contains("pins")) {
-  //   QJsonArray pins = componentData["pins"].toArray();
-  //   qDebug() << "Number of pins:" << pins.size();
-  //   qDebug() << "Pins array:" << pins;
-    
-  //   // Log each pin individually
-  //   for (int i = 0; i < pins.size(); ++i) {
-  //     qDebug() << "Pin" << i << ":" << pins[i].toString();
-  //   }
-  // }
-  
-  // // Log any other fields that might be present
-  // QStringList keys = componentData.keys();
-  // qDebug() << "All available keys:" << keys;
-  
-  // qDebug() << "=== END COMPONENT HIGHLIGHT DATA ===";
-
-  // if (m_nodeProcess->state() != QProcess::Running) {
-  //   qDebug() << "Cannot send component highlight - Node.js process not running";
-  //   return;
-  // }
-
-  // Create the component highlight command
-  QJsonObject jsonCommand;
-  jsonCommand["command"] = "component_highlight";
-  jsonCommand["pins"] = componentData["pins"];
-  jsonCommand["component_id"] = componentData["component_id"];
-  jsonCommand["component_title"] = componentData["component_title"];
-  jsonCommand["timestamp"] = QDateTime::currentMSecsSinceEpoch();
-  
-  QJsonDocument doc(jsonCommand);
-  QString jsonString = doc.toJson(QJsonDocument::Compact);
-  
-  qDebug() << "Sending component highlight to Node.js:" << jsonString;
-  
-  // Send to Node.js backend
-  m_nodeProcess->write(jsonString.toUtf8() + "\n");
+  // Add a chat message to inform the user
+  QString title = componentData["component_title"].toString();
+  if (title.isEmpty()) title = componentData["component_id"].toString();
 }
 
 void BlinkBoardWidget::handleMultipleComponentsSelected(const QJsonArray& componentsData) {
@@ -970,22 +970,82 @@ void BlinkBoardWidget::handleMultipleComponentsSelected(const QJsonArray& compon
   qDebug() << "Number of components:" << componentsData.size();
   qDebug() << "Raw JSON data:" << componentsData;
   
-  if (m_nodeProcess->state() != QProcess::Running) {
-    qDebug() << "Cannot send multiple components selection - Node.js process not running";
+  // If no components are selected, clear the highlighted components
+  if (componentsData.isEmpty()) {
+    if (!m_highlightedComponents.isEmpty()) {
+      clearHighlightedComponents();
+    }
     return;
   }
+  
+  // Store the highlighted components locally instead of sending to backend immediately
+  m_highlightedComponents = componentsData;
+  
+  // Update the display to show highlighted components
+  updateHighlightedComponentsDisplay();
+}
 
-  // Create the multiple components selection command
-  QJsonObject jsonCommand;
-  jsonCommand["command"] = "multiple_components_selected";
-  jsonCommand["components"] = componentsData;
-  jsonCommand["timestamp"] = QDateTime::currentMSecsSinceEpoch();
+void BlinkBoardWidget::addHighlightedComponent(const QJsonObject& componentData) {
+  // Check if component is already highlighted
+  for (int i = 0; i < m_highlightedComponents.size(); ++i) {
+    QJsonObject existing = m_highlightedComponents[i].toObject();
+    if (existing["component_id"].toString() == componentData["component_id"].toString()) {
+      // Update existing component
+      m_highlightedComponents[i] = componentData;
+      updateHighlightedComponentsDisplay();
+      return;
+    }
+  }
   
-  QJsonDocument doc(jsonCommand);
-  QString jsonString = doc.toJson(QJsonDocument::Compact);
-  
-  qDebug() << "Sending multiple components selection to Node.js:" << jsonString;
-  
-  // Send to Node.js backend
-  m_nodeProcess->write(jsonString.toUtf8() + "\n");
+  // Add new component
+  m_highlightedComponents.append(componentData);
+  updateHighlightedComponentsDisplay();
+}
+
+void BlinkBoardWidget::removeHighlightedComponent(const QString& componentId) {
+  for (int i = 0; i < m_highlightedComponents.size(); ++i) {
+    QJsonObject component = m_highlightedComponents[i].toObject();
+    if (component["component_id"].toString() == componentId) {
+      m_highlightedComponents.removeAt(i);
+      updateHighlightedComponentsDisplay();
+      
+      QString message = QString("Removed component '%1' from context.").arg(component["component_title"].toString());
+      addChatMessage(message, false);
+      return;
+    }
+  }
+}
+
+void BlinkBoardWidget::clearHighlightedComponents() {
+  m_highlightedComponents = QJsonArray();
+  updateHighlightedComponentsDisplay();
+}
+
+void BlinkBoardWidget::refreshHighlightedComponents() {
+  // This method can be called to refresh the display or handle external changes
+  updateHighlightedComponentsDisplay();
+}
+
+QJsonArray BlinkBoardWidget::getHighlightedComponents() const {
+  return m_highlightedComponents;
+}
+
+void BlinkBoardWidget::updateHighlightedComponentsDisplay() {
+  if (m_highlightedComponentsLabel) {
+    if (m_highlightedComponents.isEmpty()) {
+      m_highlightedComponentsLabel->setText("No components highlighted");
+      m_highlightedComponentsLabel->setStyleSheet("color: #777777; font-style: italic; padding: 5px; background-color: #f5f5f5; border: 1px solid #ddd; border-radius: 3px; font-family: 'Droid Sans'; font-size: 10px;");
+    } else {
+      // Create a simple text display with component names
+      QString text = QString("Highlighted %1 component(s) for context:").arg(m_highlightedComponents.size());
+      for (int i = 0; i < m_highlightedComponents.size(); ++i) {
+        QJsonObject component = m_highlightedComponents[i].toObject();
+        QString title = component["component_title"].toString();
+        if (title.isEmpty()) title = component["component_id"].toString();
+        text += QString("\n• %1").arg(title);
+      }
+      m_highlightedComponentsLabel->setText(text);
+      m_highlightedComponentsLabel->setStyleSheet("color: #2E8B57; font-weight: bold; padding: 5px; background-color: #f0f8f0; border: 1px solid #90EE90; border-radius: 3px; font-family: 'Droid Sans'; font-size: 10px;");
+    }
+  }
 }

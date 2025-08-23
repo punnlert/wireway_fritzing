@@ -3507,13 +3507,18 @@ void SketchWidget::selectionChangedSlot() {
 }
 
 void SketchWidget::handleMultipleBreadboardComponentsSelection() {
-	// Check if we're in breadboard view and have multiple selected items
+	// Check if we're in breadboard view
 	if (m_viewID != ViewLayer::BreadboardView) {
 		return;
 	}
 	
 	const QList<QGraphicsItem *> selectedItems = scene()->selectedItems();
+	
+	// Always emit selection change signal, even if no items are selected
+	// This allows the frontend to clear highlighted components when nothing is selected
 	if (selectedItems.count() <= 1) {
+		// Emit empty array to indicate no multiple selection
+		emit multipleBreadboardComponentsSelectedSignal(QJsonArray());
 		return;
 	}
 	
@@ -3533,6 +3538,9 @@ void SketchWidget::handleMultipleBreadboardComponentsSelection() {
 		
 		// Emit signal with the collected data
 		emit multipleBreadboardComponentsSelectedSignal(componentsData);
+	} else {
+		// Emit empty array if not enough breadboard components
+		emit multipleBreadboardComponentsSelectedSignal(QJsonArray());
 	}
 }
 
