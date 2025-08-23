@@ -77,6 +77,7 @@ public:
 
 	constexpr qint64 id() const noexcept { return m_id; }
 	void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget);
+	void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget) const;
 	double z();
 	virtual void saveGeometry() = 0;
 	ViewGeometry & getViewGeometry();
@@ -213,7 +214,7 @@ public:
 	void clearConnectorItemCache();
 	const QList<ConnectorItem *> & cachedConnectorItems();
 	const QList<ConnectorItem *> & cachedConnectorItemsConst() const;
-	bool inHover();
+	bool inHover() const;
 	virtual QRectF boundingRectWithoutLegs() const;
 	QRectF boundingRect() const;
 	virtual QPainterPath hoverShape() const;
@@ -300,6 +301,7 @@ public:
 	virtual void connectionChange(ConnectorItem * onMe, ConnectorItem * onIt, bool connect);
 	virtual void connectedMoved(ConnectorItem * from, ConnectorItem * to, QList<ConnectorItem *> & already);
 	virtual ItemBase * layerKinChief();
+	virtual ItemBase * layerKinChief() const;
 	virtual const QList<ItemBase *> & layerKin();
 	virtual void findConnectorsUnder() = 0;
 	virtual ConnectorItem* newConnectorItem(Connector *connector);
@@ -326,7 +328,18 @@ protected:
 	virtual void paintHover(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget);
 	virtual void paintHover(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget, const QPainterPath & shape);
 	virtual void paintSelected(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget);
+	virtual void paintMultipleSelected(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget);
 	virtual void paintBody(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget);
+	virtual void paintBody(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget) const;
+	
+	// Helper method to determine if this item is part of a multiple selection
+	bool isPartOfMultipleSelection() const;
+	
+	// Debug method to check component shape status
+	void debugShapeStatus() const;
+	
+	// Force shape creation for components that might not have shapes
+	void ensureShapeExists() const;
 
 	QVariant itemChange(QGraphicsItem::GraphicsItemChange change, const QVariant & value);
 
@@ -385,7 +398,7 @@ protected:
 	QPointer<ItemBase> m_superpart;
 	QList< QPointer<ItemBase> > m_subparts;
 	bool m_squashShape = false;
-	QPainterPath m_selectionShape;
+	mutable QPainterPath m_selectionShape;
 
 protected:
 	static long nextID;
@@ -401,6 +414,12 @@ public:
 	const static double HoverOpacity;
 	const static QColor ConnectorHoverColor;
 	const static double ConnectorHoverOpacity;
+	const static QColor SelectionColor;
+	const static double SelectionOpacity;
+	const static double SelectionLineWidth;
+	const static QColor MultipleSelectionColor;
+	const static double MultipleSelectionOpacity;
+	const static double MultipleSelectionLineWidth;
 
 public:
 	static void initNames();

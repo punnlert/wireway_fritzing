@@ -90,6 +90,16 @@ const double ItemBase::HoverOpacity = .20;
 const QColor ItemBase::ConnectorHoverColor(0,0,255);
 const double ItemBase::ConnectorHoverOpacity = .40;
 
+// Enhanced selection colors for better visibility
+const QColor ItemBase::SelectionColor(0, 255, 0);  // Bright green
+const double ItemBase::SelectionOpacity = .30;      // Semi-transparent
+const double ItemBase::SelectionLineWidth = 3.0;    // Thick line width
+
+// Multiple selection colors for enhanced visual feedback
+const QColor ItemBase::MultipleSelectionColor(255, 165, 0);  // Orange
+const double ItemBase::MultipleSelectionOpacity = .40;        // More opaque than single selection
+const double ItemBase::MultipleSelectionLineWidth = 4.0;     // Even thicker line for multiple selection
+
 const QColor StandardConnectedColor(0, 255, 0);
 const QColor StandardUnconnectedColor(255, 0, 0);
 
@@ -701,7 +711,7 @@ int ItemBase::itemType() const
 	return m_modelPart->itemType();
 }
 
-bool ItemBase::inHover() {
+bool ItemBase::inHover() const {
 	return (!m_inactive && (m_connectorHoverCount > 0 || m_hoverCount > 0 || m_connectorHoverCount2 > 0));
 }
 
@@ -722,7 +732,96 @@ void ItemBase::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, 
 	paintBody(painter, option, widget);
 
 	if (option->state & QStyle::State_Selected) {
-		layerKinChief()->paintSelected(painter, option, widget);
+		// Check if this is part of a multiple selection
+		if (isPartOfMultipleSelection()) {
+			layerKinChief()->paintMultipleSelected(painter, option, widget);
+		} else {
+			layerKinChief()->paintSelected(painter, option, widget);
+		}
+	}
+
+	if (m_inactive) {
+		painter->restore();
+	}
+}
+
+void ItemBase::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget) const
+{
+	if (inHover()) {
+		//DebugDialog::debug(QString("chc:%1 hc:%2 chc2:%3").arg(m_connectorHoverCount).arg(m_hoverCount).arg(m_connectorHoverCount2));
+		// For const paint method, we don't call methods that modify state
+		// Just paint the basic hover effect without modifying the object
+		painter->save();
+		if (m_connectorHoverCount > 0 || m_connectorHoverCount2 > 0) {
+			painter->setOpacity(ConnectorHoverOpacity);
+			painter->setPen(QPen(ConnectorHoverColor, 2.0, Qt::SolidLine));
+			painter->setBrush(QBrush(ConnectorHoverColor));
+			QPainterPath shape = hoverShape();
+			if (shape.isEmpty()) {
+				shape = this->shape();
+			}
+			if (!shape.isEmpty()) {
+				painter->drawPath(shape);
+			}
+		}
+		painter->restore();
+	}
+	//else {
+	//DebugDialog::debug("no hover");
+	//}
+
+	if (m_inactive) {
+		painter->save();
+		painter->setOpacity(InactiveOpacity);
+	}
+
+	paintBody(painter, option, widget);
+
+	if (option->state & QStyle::State_Selected) {
+		// For const paint method, we don't call methods that modify state
+		// Just paint the basic selection effect without modifying the object
+		painter->save();
+		
+		// Use existing shapes without creating new ones
+		QPainterPath shape = hoverShape();
+		if (shape.isEmpty()) {
+			shape = this->shape();
+		}
+		if (shape.isEmpty()) {
+			shape = m_selectionShape;
+		}
+		
+		if (!shape.isEmpty()) {
+			// Check if this is part of a multiple selection
+			if (isPartOfMultipleSelection()) {
+				// Paint multiple selection effect
+				painter->setOpacity(MultipleSelectionOpacity);
+				QPen multiSelectionPen(MultipleSelectionColor, MultipleSelectionLineWidth);
+				multiSelectionPen.setStyle(Qt::SolidLine);
+				painter->setPen(multiSelectionPen);
+				QBrush multiSelectionBrush(MultipleSelectionColor);
+				painter->setBrush(multiSelectionBrush);
+				painter->drawPath(shape);
+				
+				// Add dashed outline
+				QPen dashedPen(MultipleSelectionColor, 1.0, Qt::DashLine);
+				dashedPen.setDashPattern({8, 4});
+				painter->setPen(dashedPen);
+				painter->setBrush(Qt::NoBrush);
+				painter->drawPath(shape);
+			} else {
+				// Paint single selection effect
+				painter->setOpacity(SelectionOpacity);
+				QPen selectionPen(SelectionColor, SelectionLineWidth);
+				selectionPen.setStyle(Qt::SolidLine);
+				painter->setPen(selectionPen);
+				QBrush selectionBrush(SelectionColor);
+				painter->setBrush(selectionBrush);
+				painter->drawPath(shape);
+			}
+		}
+		
+		painter->restore();
 	}
 
 	if (m_inactive) {
@@ -736,6 +835,12 @@ void ItemBase::paintBody(QPainter *painter, const QStyleOptionGraphicsItem * /* 
 	fsvgRenderer()->render(painter, boundingRectWithoutLegs());
 }
 
+void ItemBase::paintBody(QPainter *painter, const QStyleOptionGraphicsItem * /* option */, QWidget * /* widget */) const
+{
+	// Qt's SVG renderer's defaultSize is not correct when the svg has a fractional pixel size
+	fsvgRenderer()->render(painter, boundingRectWithoutLegs());
+}
+
 void ItemBase::paintHover(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget)
 {
 	paintHover(painter, option, widget, hoverShape());
@@ -743,21 +848,228 @@ void ItemBase::paintHover(QPainter *painter, const QStyleOptionGraphicsItem *opt
 
 void ItemBase::paintSelected(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget * /* widget */)
 {
-	GraphicsUtils::qt_graphicsItem_highlightSelected(painter, option, boundingRect(), hoverShape());
+	// Enhanced selection painting with thick green lines and semi-transparent green fill
+	painter->save();
+	
+	// Set the selection color and opacity
+	painter->setOpacity(SelectionOpacity);
+	
+	// Create a thick green pen for the outline
+	QPen selectionPen(SelectionColor, SelectionLineWidth);
+	selectionPen.setStyle(Qt::SolidLine);
+	painter->setPen(selectionPen);
+	
+	// Fill the shape with semi-transparent green
+	QBrush selectionBrush(SelectionColor);
+	painter->setBrush(selectionBrush);
+	
+	// Try to get the best available shape for highlighting
+	QPainterPath shape = hoverShape();
+	
+	// If hoverShape is empty, try to get the actual shape
+	if (shape.isEmpty()) {
+		shape = this->shape();
+	}
+	
+	// If still empty, try to get the selection shape
+	if (shape.isEmpty()) {
+		shape = m_selectionShape;
+	}
+	
+	// If all shapes are empty, try to force shape creation
+	if (shape.isEmpty()) {
+		ensureShapeExists();
+		shape = m_selectionShape;
+	}
+	
+	// If still empty, fall back to bounding rect with some padding
+	if (shape.isEmpty()) {
+		QRectF rect = boundingRect();
+		// Add some padding to make the highlight more visible
+		rect.adjust(-2, -2, 2, 2);
+		shape.addRect(rect);
+	}
+	
+	// Debug: Log shape information for problematic components
+	if (shape.isEmpty()) {
+		qDebug() << "WARNING: Component" << m_id << "(" << title() << ") has no valid shape for highlighting!";
+		debugShapeStatus();
+	}
+	
+	// Draw the filled shape with thick outline
+	painter->drawPath(shape);
+	
+	// Also call the original highlight method for additional visual feedback
+	GraphicsUtils::qt_graphicsItem_highlightSelected(painter, option, boundingRect(), shape);
+	
+	painter->restore();
 }
 
-void ItemBase::paintHover(QPainter *painter, const QStyleOptionGraphicsItem * /*option*/, QWidget * /*widget*/, const QPainterPath & shape)
+void ItemBase::paintHover(QPainter *painter, const QStyleOptionGraphicsItem * /*option*/, QWidget * /*widget*/, const QPainterPath & inputShape)
 {
 	painter->save();
+	
+	// Use the input shape if provided, otherwise try to get the best available shape
+	QPainterPath shape = inputShape;
+	if (shape.isEmpty()) {
+		// Try to get the best available shape for highlighting
+		shape = hoverShape();
+		
+		// If hoverShape is empty, try to get the actual shape
+		if (shape.isEmpty()) {
+			shape = this->shape();
+		}
+		
+		// If still empty, try to get the selection shape
+		if (shape.isEmpty()) {
+			shape = m_selectionShape;
+		}
+		
+		// If all shapes are empty, try to force shape creation
+		if (shape.isEmpty()) {
+			ensureShapeExists();
+			shape = m_selectionShape;
+		}
+		
+		// If still empty, fall back to bounding rect with some padding
+		if (shape.isEmpty()) {
+			QRectF rect = boundingRect();
+			// Add some padding to make the highlight more visible
+			rect.adjust(-1, -1, 1, 1);
+			shape.addRect(rect);
+		}
+	}
+	
 	if (m_connectorHoverCount > 0 || m_connectorHoverCount2 > 0) {
+		// Enhanced connector hover with blue outline and fill
 		painter->setOpacity(ConnectorHoverOpacity);
-		painter->fillPath(shape, QBrush(ConnectorHoverColor));
+		painter->setPen(QPen(ConnectorHoverColor, 2.0, Qt::SolidLine));
+		painter->setBrush(QBrush(ConnectorHoverColor));
+		painter->drawPath(shape);
 	}
 	else {
+		// Enhanced general hover with black outline and fill
 		painter->setOpacity(HoverOpacity);
-		painter->fillPath(shape, QBrush(HoverColor));
+		painter->setPen(QPen(HoverColor, 1.5, Qt::SolidLine));
+		painter->setBrush(QBrush(HoverColor));
+		painter->drawPath(shape);
 	}
 	painter->restore();
+}
+
+void ItemBase::paintMultipleSelected(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget * /* widget */)
+{
+	// Special painting for multiple component selection with enhanced visual feedback
+	painter->save();
+	
+	// Set the selection color and opacity using class constants
+	painter->setOpacity(MultipleSelectionOpacity);
+	
+	// Create a thick orange pen for the outline
+	QPen multiSelectionPen(MultipleSelectionColor, MultipleSelectionLineWidth);
+	multiSelectionPen.setStyle(Qt::SolidLine);
+	painter->setPen(multiSelectionPen);
+	
+	// Fill the shape with semi-transparent orange
+	QBrush multiSelectionBrush(MultipleSelectionColor);
+	painter->setBrush(multiSelectionBrush);
+	
+	// Try to get the best available shape for highlighting
+	QPainterPath shape = hoverShape();
+	
+	// If hoverShape is empty, try to get the actual shape
+	if (shape.isEmpty()) {
+		shape = this->shape();
+	}
+	
+	// If still empty, try to get the selection shape
+	if (shape.isEmpty()) {
+		shape = m_selectionShape;
+	}
+	
+	// If all shapes are empty, try to force shape creation
+	if (shape.isEmpty()) {
+		ensureShapeExists();
+		shape = m_selectionShape;
+	}
+	
+	// If still empty, fall back to bounding rect with some padding
+	if (shape.isEmpty()) {
+		QRectF rect = boundingRect();
+		// Add some padding to make the highlight more visible
+		rect.adjust(-2, -2, 2, 2);
+		shape.addRect(rect);
+	}
+	
+	// Draw the filled shape with thick outline
+	painter->drawPath(shape);
+	
+	// Add a dashed outline on top for extra emphasis
+	QPen dashedPen(MultipleSelectionColor, 1.0, Qt::DashLine);
+	dashedPen.setDashPattern({8, 4});  // 8 pixels dash, 4 pixels space
+	painter->setPen(dashedPen);
+	painter->setBrush(Qt::NoBrush);
+	painter->drawPath(shape);
+	
+	painter->restore();
+}
+
+bool ItemBase::isPartOfMultipleSelection() const
+{
+	// Check if this item is part of a multiple selection
+	// This is determined by checking if the scene has multiple selected items
+	// and this item is one of them
+	if (scene()) {
+		QList<QGraphicsItem *> selectedItems = scene()->selectedItems();
+		return selectedItems.count() > 1 && isSelected();
+	}
+	return false;
+}
+
+void ItemBase::debugShapeStatus() const
+{
+	qDebug() << "=== Component Shape Debug ===";
+	qDebug() << "Component ID:" << m_id;
+	qDebug() << "Component Title:" << constTitle();
+	qDebug() << "View ID:" << m_viewID;
+	
+	// Check hoverShape
+	QPainterPath hover = hoverShape();
+	qDebug() << "hoverShape empty:" << hover.isEmpty();
+	qDebug() << "hoverShape element count:" << hover.elementCount();
+	
+	// Check actual shape
+	QPainterPath actual = this->shape();
+	qDebug() << "actual shape empty:" << actual.isEmpty();
+	qDebug() << "actual shape element count:" << actual.elementCount();
+	
+	// Check selection shape
+	qDebug() << "selection shape empty:" << m_selectionShape.isEmpty();
+	qDebug() << "selection shape element count:" << m_selectionShape.elementCount();
+	
+	// Check bounding rect
+	QRectF rect = boundingRect();
+	qDebug() << "bounding rect:" << rect;
+	qDebug() << "bounding rect valid:" << rect.isValid();
+	
+	qDebug() << "=== End Component Shape Debug ===";
+}
+
+void ItemBase::ensureShapeExists() const
+{
+	// Force shape creation for components that might not have shapes
+	if (hoverShape().isEmpty() && this->shape().isEmpty() && m_selectionShape.isEmpty()) {
+		// Try to create a basic shape from the bounding rect
+		QRectF rect = boundingRect();
+		if (rect.isValid()) {
+			// Create a rounded rectangle shape for better visual appeal
+			QPainterPath newShape;
+			newShape.addRoundedRect(rect, 2.0, 2.0);  // 2px corner radius
+			m_selectionShape = newShape;
+			
+			qDebug() << "Created fallback shape for component" << m_id << "(" << constTitle() << ")";
+		}
+	}
 }
 
 void ItemBase::mousePressEvent(QGraphicsSceneMouseEvent *event) {
@@ -1276,6 +1588,10 @@ const QList<ItemBase *> & ItemBase::layerKin() {
 
 ItemBase * ItemBase::layerKinChief() {
 	return this;
+}
+
+ItemBase * ItemBase::layerKinChief() const {
+	return const_cast<ItemBase*>(this);
 }
 
 void ItemBase::rotateItem(double degrees, bool includeRatsnest) {

@@ -46,6 +46,8 @@ let schematics;
 let schematic_file_change = false;
 let testGroups = []; // Store test groups for the test window
 
+let openai_chat_context = [];
+
 // Serial port detection
 let serialPorts = [];
 let blinkboard_serial_port;
@@ -937,6 +939,80 @@ function blink_command_pins(pins, pattern) {
   });
 }
 
+function blink_component(pins, pattern) {
+  let leds = [];
+
+  for (const pin of pins) {
+    // INSERT_YOUR_CODE
+    // Only process pins that match the format 'pin[num][row]' where num is 1-50 and row is A-H or J
+    // Example: 'pin12A', 'pin3B', etc.
+    const pinMatch = /^pin([1-9]|[1-4][0-9]|50)([A-Z])$/.exec(pin);
+    if (pinMatch) {
+      const rowNum = Number(pinMatch[1]);
+      const rowLetter = pinMatch[2];
+
+      console.log("rowNum", rowNum);
+      console.log("rowLetter", rowLetter);
+
+      if (rowNum >= 1 && rowNum <= 50) {
+        if (rowLetter >= "A" && rowLetter <= "E") {
+          if (rowNum <= 25) {
+            leds.push(rowNum);
+            write_json_to_port({
+              cmd: "setLed",
+              led: rowNum,
+              pattern: pattern,
+            });
+          }
+        } else if (rowLetter >= "F" && rowLetter <= "H") {
+          leds.push(rowNum + 25);
+          write_json_to_port({
+            cmd: "setLed",
+            led: rowNum + 25,
+            pattern: pattern,
+          });
+        }
+      }
+      if (rowLetter == "W" || rowLetter == "Y") {
+        leds.push("vcc");
+        write_json_to_port({
+          cmd: "setCmdLed",
+          led: "vcc",
+          pattern: pattern,
+        });
+      } else if (rowLetter == "X" || rowLetter == "Z") {
+        leds.push("gnd");
+        write_json_to_port({
+          cmd: "setCmdLed",
+          led: "gnd",
+          pattern: pattern,
+        });
+      }
+    }
+  }
+
+  // Reset after highlighting
+  setTimeout(() => {
+    if (leds.length > 0) {
+      for (const led of leds) {
+        if (led === "vcc" || led === "gnd") {
+          write_json_to_port({
+            cmd: "setCmdLed",
+            led: led,
+            pattern: "off",
+          });
+        } else {
+          write_json_to_port({
+            cmd: "setLed",
+            led: led,
+            pattern: "off",
+          });
+        }
+      }
+    }
+  }, 3000); // Shorter duration for component highlighting
+}
+
 function request_voltage_data() {
   write_json_to_port({
     cmd: "reset",
@@ -1229,104 +1305,21 @@ async function processCommand(command) {
         console.log(
           `🔘 Received component highlight request for: ${component_title}`
         );
-        console.log("pins", pins);
-        let leds = [];
 
-        for (const pin of pins) {
-          // INSERT_YOUR_CODE
-          // Only process pins that match the format 'pin[num][row]' where num is 1-50 and row is A-H or J
-          // Example: 'pin12A', 'pin3B', etc.
-          const pinMatch = /^pin([1-9]|[1-4][0-9]|50)([A-Z])$/.exec(pin);
-          if (pinMatch) {
-            const rowNum = Number(pinMatch[1]);
-            const rowLetter = pinMatch[2];
+        // const component = JSON.stringify({
+        //   component_id,
+        //   component_title,
+        //   pins,
+        // });
 
-            console.log("rowNum", rowNum);
-            console.log("rowLetter", rowLetter);
+        // openai_chat_context = [
+        //   {
+        //     role: "developer",
+        //     content: `this component is highlighted on the user's UI: ${component}`,
+        //   },
+        // ];
 
-            if (rowNum >= 1 && rowNum <= 50) {
-              if (rowLetter >= "A" && rowLetter <= "E") {
-                if (rowNum <= 25) {
-                  leds.push(rowNum);
-                  write_json_to_port({
-                    cmd: "setLed",
-                    led: rowNum,
-                    pattern: "on",
-                  });
-                }
-              } else if (rowLetter >= "F" && rowLetter <= "H") {
-                leds.push(rowNum + 25);
-                write_json_to_port({
-                  cmd: "setLed",
-                  led: rowNum + 25,
-                  pattern: "on",
-                });
-              }
-            }
-            if (rowLetter == "W" || rowLetter == "Y") {
-              leds.push("vcc");
-              write_json_to_port({
-                cmd: "setCmdLed",
-                led: "vcc",
-                pattern: "on",
-              });
-            } else if (rowLetter == "X" || rowLetter == "Z") {
-              leds.push("gnd");
-              write_json_to_port({
-                cmd: "setCmdLed",
-                led: "gnd",
-                pattern: "on",
-              });
-            }
-          }
-        }
-        // for (const pin of schematics.schematics_json) {
-        //   for (const part of pin.parts) {
-        //     console.log("part", part.id);
-        //     if (part.id == Number(component_id)) {
-        //       if (pin.row < 51) {
-        //         write_json_to_port({
-        //           cmd: "setLed",
-        //           led: pin.row,
-        //           pattern: "on",
-        //         });
-        //       } else if (pin.row === 51) {
-        //         write_json_to_port({
-        //           cmd: "setCmdLed",
-        //           led: "vcc",
-        //           pattern: "on",
-        //         });
-        //       } else if (pin.row === 52) {
-        //         write_json_to_port({
-        //           cmd: "setCmdLed",
-        //           led: "gnd",
-        //           pattern: "on",
-        //         });
-        //       }
-        //     }
-        //   }
-        // }
-
-        // Reset after highlighting
-        setTimeout(() => {
-          if (leds.length > 0) {
-            for (const led of leds) {
-              if (led === "vcc" || led === "gnd") {
-                write_json_to_port({
-                  cmd: "setCmdLed",
-                  led: led,
-                  pattern: "off",
-                });
-              } else {
-                write_json_to_port({
-                  cmd: "setLed",
-                  led: led,
-                  pattern: "off",
-                });
-              }
-            }
-          }
-        }, 3000); // Shorter duration for component highlighting
+        blink_component(pins, "on");
 
         return {
           status: "success",
@@ -1336,6 +1329,30 @@ async function processCommand(command) {
         };
       } catch (error) {
         return createErrorResponse(error, 800); // Line number for component_highlight
+      }
+
+    case "multiple_components_selected":
+      try {
+        const { components } = command;
+
+        // Use a Set to ensure only unique pins are included
+
+        // const components_string = JSON.stringify(
+        //   components.map(({ component_id, component_title, pins }) => ({
+        //     component_id,
+        //     component_title,
+        //     pins,
+        //   }))
+        // );
+
+        // openai_chat_context = [
+        //   {
+        //     role: "developer",
+        //     content: `these components are highlighted on the user's UI: ${components_string}`,
+        //   },
+        // ];
+      } catch (error) {
+        return createErrorResponse(error, 900); // Line number for multiple_components_selected
       }
 
     case "request_voltage_data":
