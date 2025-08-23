@@ -38,6 +38,9 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include <QStyle>
 #include <QFontMetrics>
 #include <QApplication>
+#include <QJsonObject>
+#include <QJsonArray>
+#include <QJsonDocument>
 
 
 #include "mainwindow.h"
@@ -719,6 +722,10 @@ void MainWindow::connectPairs() {
 	succeeded =  succeeded && connect(m_schematicGraphicsView, SIGNAL(getDroppedItemViewLayerPlacementSignal(ModelPart *, ViewLayer::ViewLayerPlacement &)),
 	                                  m_pcbGraphicsView, SLOT(getDroppedItemViewLayerPlacement(ModelPart *, ViewLayer::ViewLayerPlacement &)),
 	                                  Qt::DirectConnection);
+
+	// Connect the new multiple components selection signal from breadboard view to MainWindow
+	succeeded =  succeeded && connect(m_breadboardGraphicsView, SIGNAL(multipleBreadboardComponentsSelectedSignal(QJsonArray)),
+	                                  this, SLOT(handleMultipleBreadboardComponentsSelected(QJsonArray)));
 
 
 	if (!succeeded) {
@@ -3204,4 +3211,9 @@ void MainWindow::setInitialTab(int tab) {
 void MainWindow::handleBreadboardComponentHighlighted(const QJsonObject& componentData) {
 	// Emit the signal to the BlinkBoardWidget
 	emit breadboardComponentHighlighted(componentData);
+}
+
+void MainWindow::handleMultipleBreadboardComponentsSelected(const QJsonArray& componentsData) {
+	// Emit the signal to the BlinkBoardWidget
+	emit multipleBreadboardComponentsSelected(componentsData);
 }

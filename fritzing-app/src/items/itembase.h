@@ -409,6 +409,7 @@ public:
 	static QString translatePropertyName(const QString & key);
 	static void setReferenceModel(ReferenceModel *);
 	static void renderOne(QDomDocument *, QImage *, const QRectF & renderRect);
+	static QJsonArray collectMultipleBreadboardComponentsData(const QList<QGraphicsItem *> &selectedItems);
 
 
 

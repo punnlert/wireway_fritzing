@@ -3475,6 +3475,9 @@ void SketchWidget::selectionChangedSlot() {
 	}
 
 	emit selectionChangedSignal();
+	
+	// Handle multiple breadboard components selection
+	handleMultipleBreadboardComponentsSelection();
 
 	if (m_holdingSelectItemCommand) {
 		//DebugDialog::debug("update holding command");
@@ -3500,6 +3503,36 @@ void SketchWidget::selectionChangedSlot() {
 		}
 		m_holdingSelectItemCommand->setText(selString);
 		m_holdingSelectItemCommand->setUpdated(true);
+	}
+}
+
+void SketchWidget::handleMultipleBreadboardComponentsSelection() {
+	// Check if we're in breadboard view and have multiple selected items
+	if (m_viewID != ViewLayer::BreadboardView) {
+		return;
+	}
+	
+	const QList<QGraphicsItem *> selectedItems = scene()->selectedItems();
+	if (selectedItems.count() <= 1) {
+		return;
+	}
+	
+	// Count how many breadboard components are selected
+	int breadboardComponentCount = 0;
+	foreach (QGraphicsItem *item, selectedItems) {
+		ItemBase *itemBase = dynamic_cast<ItemBase *>(item);
+		if (itemBase && itemBase->viewID() == ViewLayer::BreadboardView) {
+			breadboardComponentCount++;
+		}
+	}
+	
+	// Only proceed if we have multiple breadboard components
+	if (breadboardComponentCount > 1) {
+		// Collect data from all selected breadboard components
+		QJsonArray componentsData = ItemBase::collectMultipleBreadboardComponentsData(selectedItems);
+		
+		// Emit signal with the collected data
+		emit multipleBreadboardComponentsSelectedSignal(componentsData);
 	}
 }
 
@@ -10178,3 +10211,4 @@ void SketchWidget::checkForReversedWires() {
 		}
 	}
 }
+

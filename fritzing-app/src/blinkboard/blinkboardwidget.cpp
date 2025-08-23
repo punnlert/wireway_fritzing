@@ -964,3 +964,28 @@ void BlinkBoardWidget::handleComponentHighlighted(const QJsonObject& componentDa
   // Send to Node.js backend
   m_nodeProcess->write(jsonString.toUtf8() + "\n");
 }
+
+void BlinkBoardWidget::handleMultipleComponentsSelected(const QJsonArray& componentsData) {
+  qDebug() << "=== MULTIPLE COMPONENTS SELECTION DATA RECEIVED ===";
+  qDebug() << "Number of components:" << componentsData.size();
+  qDebug() << "Raw JSON data:" << componentsData;
+  
+  if (m_nodeProcess->state() != QProcess::Running) {
+    qDebug() << "Cannot send multiple components selection - Node.js process not running";
+    return;
+  }
+
+  // Create the multiple components selection command
+  QJsonObject jsonCommand;
+  jsonCommand["command"] = "multiple_components_selected";
+  jsonCommand["components"] = componentsData;
+  jsonCommand["timestamp"] = QDateTime::currentMSecsSinceEpoch();
+  
+  QJsonDocument doc(jsonCommand);
+  QString jsonString = doc.toJson(QJsonDocument::Compact);
+  
+  qDebug() << "Sending multiple components selection to Node.js:" << jsonString;
+  
+  // Send to Node.js backend
+  m_nodeProcess->write(jsonString.toUtf8() + "\n");
+}

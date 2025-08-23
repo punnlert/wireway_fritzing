@@ -38,6 +38,7 @@ public slots:
   void handleBlinkRequest(const QJsonObject &test, const QString &action);
   void handleMeasureRequest(const QJsonObject &test);
   void handleComponentHighlighted(const QJsonObject& componentData);
+  void handleMultipleComponentsSelected(const QJsonArray& componentsData);
 
 signals:
   void testsReceived(const QJsonArray &tests);

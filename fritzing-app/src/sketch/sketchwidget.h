@@ -337,6 +337,7 @@ public:
 	void testConnectors();
 	void updateWires();
 	void checkForReversedWires();
+	void handleMultipleBreadboardComponentsSelection();
 
 protected:
 	void dragEnterEvent(QDragEnterEvent *);
@@ -534,6 +535,7 @@ signals:
 	void copyBoundingRectsSignal(QHash<QString, QRectF> &);
 	void cleanUpWiresSignal(CleanUpWiresCommand *);
 	void selectionChangedSignal();
+	void multipleBreadboardComponentsSelectedSignal(const QJsonArray& componentsData);
 
 	void resizeSignal();
 	void dropSignal(const QPoint &pos);

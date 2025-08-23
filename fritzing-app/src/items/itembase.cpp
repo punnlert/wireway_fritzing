@@ -2445,3 +2445,44 @@ void ItemBase::setInspectorTitle(const QString & oldText, const QString & newTex
 	DebugDialog::debug(QString("set instance title to %1").arg(newText));
 	infoGraphicsView->setInstanceTitle(id(), oldText, newText, true, false);
 }
+
+QJsonArray ItemBase::collectMultipleBreadboardComponentsData(const QList<QGraphicsItem *> &selectedItems) {
+	QJsonArray componentsArray;
+	
+	foreach (QGraphicsItem *item, selectedItems) {
+		ItemBase *itemBase = dynamic_cast<ItemBase *>(item);
+		if (!itemBase || itemBase->viewID() != ViewLayer::BreadboardView) {
+			continue;
+		}
+		
+		// Get breadboard pin information for this component
+		QJsonObject componentData;
+		componentData["component_id"] = QString::number(itemBase->id());
+		componentData["component_title"] = itemBase->title();
+		
+		// Get actual breadboard pin connections
+		QJsonArray pinsArray;
+		const QList<ConnectorItem *> &connectors = itemBase->cachedConnectorItems();
+		
+		if (connectors.count() > 0) {
+			foreach (ConnectorItem *connector, connectors) {
+				if (connector && connector->connectionsCount() > 0) {
+					foreach (ConnectorItem *connectedConnector, connector->connectedToItems()) {
+						if (connectedConnector) {
+							ItemBase *connectedItem = connectedConnector->attachedTo();
+							if (connectedItem && connectedItem->viewID() == ViewLayer::BreadboardView) {
+								QString pinInfo = QString("%1").arg(connectedConnector->connectorSharedID());
+								pinsArray.append(pinInfo);
+							}
+						}
+					}
+				}
+			}
+		}
+		
+		componentData["pins"] = pinsArray;
+		componentsArray.append(componentData);
+	}
+	
+	return componentsArray;
+}
