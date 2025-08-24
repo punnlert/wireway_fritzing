@@ -939,6 +939,29 @@ function blink_command_pins(pins, pattern) {
   });
 }
 
+function convert_pinname_to_row_num(pinname) {
+  const pinMatch = /^pin([1-9]|[1-4][0-9]|50)([A-Z])$/.exec(pinname);
+  if (pinMatch) {
+    const rowNum = Number(pinMatch[1]);
+    const rowLetter = pinMatch[2];
+
+    if (rowNum >= 1 && rowNum <= 50) {
+      if (rowLetter >= "A" && rowLetter <= "E") {
+        if (rowNum <= 25) {
+          return rowNum;
+        }
+      } else if (rowLetter >= "F" && rowLetter <= "H") {
+        return rowNum + 25;
+      }
+    }
+    if (rowLetter == "W" || rowLetter == "Y") {
+      return 51;
+    } else if (rowLetter == "X" || rowLetter == "Z") {
+      return 52;
+    }
+  }
+}
+
 function blink_component(pins, pattern) {
   let leds = [];
 
@@ -946,48 +969,29 @@ function blink_component(pins, pattern) {
     // INSERT_YOUR_CODE
     // Only process pins that match the format 'pin[num][row]' where num is 1-50 and row is A-H or J
     // Example: 'pin12A', 'pin3B', etc.
-    const pinMatch = /^pin([1-9]|[1-4][0-9]|50)([A-Z])$/.exec(pin);
-    if (pinMatch) {
-      const rowNum = Number(pinMatch[1]);
-      const rowLetter = pinMatch[2];
+    const rowNum = convert_pinname_to_row_num(pin);
 
-      console.log("rowNum", rowNum);
-      console.log("rowLetter", rowLetter);
-
-      if (rowNum >= 1 && rowNum <= 50) {
-        if (rowLetter >= "A" && rowLetter <= "E") {
-          if (rowNum <= 25) {
-            leds.push(rowNum);
-            write_json_to_port({
-              cmd: "setLed",
-              led: rowNum,
-              pattern: pattern,
-            });
-          }
-        } else if (rowLetter >= "F" && rowLetter <= "H") {
-          leds.push(rowNum + 25);
-          write_json_to_port({
-            cmd: "setLed",
-            led: rowNum + 25,
-            pattern: pattern,
-          });
-        }
-      }
-      if (rowLetter == "W" || rowLetter == "Y") {
-        leds.push("vcc");
-        write_json_to_port({
-          cmd: "setCmdLed",
-          led: "vcc",
-          pattern: pattern,
-        });
-      } else if (rowLetter == "X" || rowLetter == "Z") {
-        leds.push("gnd");
-        write_json_to_port({
-          cmd: "setCmdLed",
-          led: "gnd",
-          pattern: pattern,
-        });
-      }
+    if (rowNum && rowNum <= 50) {
+      leds.push(rowNum);
+      write_json_to_port({
+        cmd: "setLed",
+        led: rowNum,
+        pattern: pattern,
+      });
+    } else if (rowNum && rowNum === 51) {
+      leds.push("vcc");
+      write_json_to_port({
+        cmd: "setCmdLed",
+        led: "vcc",
+        pattern: pattern,
+      });
+    } else if (rowNum && rowNum === 52) {
+      leds.push("gnd");
+      write_json_to_port({
+        cmd: "setCmdLed",
+        led: "gnd",
+        pattern: pattern,
+      });
     }
   }
 
@@ -1023,7 +1027,7 @@ function request_voltage_data() {
   });
 }
 
-async function send_openai_message(message) {
+async function send_openai_message(message, mode) {
   const eventHandler = new EventHandler(openai);
   eventHandler.on("event", eventHandler.onEvent.bind(eventHandler));
 
@@ -1443,26 +1447,25 @@ async function processCommand(command) {
           highlighted_components !== undefined &&
           highlighted_components.length > 0
         ) {
-          // console.log(`Highlighted components:`, highlighted_components);
-
           // Create context string from highlighted components
           let contextString = `\n\nContext - Highlighted Components:\n`;
           highlighted_components.forEach((component, index) => {
             const title = component.component_title || component.component_id;
-            const pins = component.pins ? component.pins.join(", ") : "No pins";
+            const row_numbers = component.pins
+              ? component.pins
+                  .map((pin) => convert_pinname_to_row_num(pin))
+                  .join(", ")
+              : "No row connected";
             contextString += `${index + 1}. ${title} (ID: ${
               component.component_id
-            }) - Pins: ${pins}\n`;
+            }) - Row Numbers: ${row_numbers}\n`;
           });
 
           let query_text = `${message}${contextString}\n\nAdd any tests or suggestions if necessary. You can explain the test in your reply but you don't have to mention some trivial details like test_key`;
-          // const response = await send_openai_message(query_text);
+          const response = await send_openai_message(query_text, mode);
         } else {
-          // No highlighted components, send regular chat message
-          // console.log(`No highlighted components provided`);
-
           let query_text = `${message} \n Add any tests or suggestions if necessary. You can explain the test in your reply but you don't have to mention some trivial details like test_key`;
-          // const response = await send_openai_message(query_text);
+          const response = await send_openai_message(query_text, mode);
         }
 
         return;
