@@ -41,7 +41,9 @@ BlinkBoardWidget::BlinkBoardWidget(QWidget *parent)
       m_messageInput(new QLineEdit()),
       m_sendButton(new QPushButton("Send")),
       m_updateSchematicsButton(new QPushButton("Update Schematics")),
-      m_inputLayout(new QHBoxLayout()) {
+      m_inputLayout(new QHBoxLayout()),
+      m_modeToggleButton(new QPushButton("Asking")),
+      m_isAskingMode(true) {
 
   auto frame = new QFrame(this);
 
@@ -69,6 +71,14 @@ BlinkBoardWidget::BlinkBoardWidget(QWidget *parent)
   // Setup update schematics button
   m_updateSchematicsButton->setStyleSheet("QPushButton { padding: 5px 15px; background: #ececec; color: #323232; border: 1px solid #b1b1b1; border-radius: 0px; font-family: 'Droid Sans'; font-size: 11px; } QPushButton:hover { background: #666666; color: #ffffff; } QPushButton:pressed { background: #f23926; color: #d9d9d9; }");
   m_updateSchematicsButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+
+  // Setup mode toggle button - allows switching between "asking" and "testing" modes
+  // Asking mode: User asks questions about the circuit
+  // Testing mode: User requests tests or validation of the circuit
+  m_modeToggleButton->setStyleSheet("QPushButton { padding: 5px 10px; background: #4CAF50; color: white; border: 1px solid #45a049; border-radius: 0px; font-family: 'Droid Sans'; font-size: 10px; } QPushButton:hover { background: #45a049; } QPushButton:pressed { background: #3d8b40; }");
+  m_modeToggleButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+  m_modeToggleButton->setToolTip("Toggle between Asking and Testing modes");
+  m_modeToggleButton->setFixedWidth(80); // Set fixed width to make it compact
 
   // Setup input layout
   m_inputLayout->addWidget(m_messageInput);
@@ -116,6 +126,7 @@ BlinkBoardWidget::BlinkBoardWidget(QWidget *parent)
   connect(m_sendButton, SIGNAL(clicked()), this, SLOT(handleSendMessage()));
   connect(m_updateSchematicsButton, SIGNAL(clicked()), this, SLOT(handleUpdateSchematics()));
   connect(m_messageInput, SIGNAL(returnPressed()), this, SLOT(handleSendMessage()));
+  connect(m_modeToggleButton, SIGNAL(clicked()), this, SLOT(handleModeToggle()));
 
   // Connect Node.js process signals
   connect(m_nodeProcess, &QProcess::readyReadStandardOutput, 
@@ -169,6 +180,25 @@ BlinkBoardWidget::BlinkBoardWidget(QWidget *parent)
   m_highlightedComponentsLabel->setAlignment(Qt::AlignLeft | Qt::AlignTop);
   m_mainLayout->addWidget(m_highlightedComponentsLabel);
   
+  // Add mode indicator and toggle button in a horizontal layout
+  QHBoxLayout *modeLayout = new QHBoxLayout();
+  modeLayout->setContentsMargins(0, 0, 0, 0);
+  modeLayout->setSpacing(8);
+  modeLayout->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+  
+  m_modeIndicatorLabel = new QLabel("Current Mode: Asking");
+  m_modeIndicatorLabel->setStyleSheet("QLabel { color: #4CAF50; font-weight: bold; padding: 5px; background-color: #f0f8f0; border: 1px solid #4CAF50; border-radius: 3px; font-family: 'Droid Sans'; font-size: 10px; }");
+  m_modeIndicatorLabel->setWordWrap(true);
+  m_modeIndicatorLabel->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+  m_modeIndicatorLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+  
+  modeLayout->addWidget(m_modeIndicatorLabel);
+  modeLayout->addWidget(m_modeToggleButton);
+  modeLayout->setStretch(0, 1); // Mode indicator expands
+  modeLayout->setStretch(1, 0); // Toggle button fixed size
+  
+  m_mainLayout->addLayout(modeLayout);
+  
   m_mainLayout->addLayout(m_inputLayout);
   
   // Add separator - match Fritzing separator style
@@ -183,9 +213,12 @@ BlinkBoardWidget::BlinkBoardWidget(QWidget *parent)
   
   // Set stretch factors to make chat area expand
   m_mainLayout->setStretch(0, 1); // Chat display gets most space
-  m_mainLayout->setStretch(1, 0); // Input area fixed height
-  m_mainLayout->setStretch(2, 0); // Separator fixed height
-  m_mainLayout->setStretch(3, 0); // Button fixed height
+  m_mainLayout->setStretch(1, 0); // Help label fixed height
+  m_mainLayout->setStretch(2, 0); // Highlighted components fixed height
+  m_mainLayout->setStretch(3, 0); // Mode layout (indicator + toggle) fixed height
+  m_mainLayout->setStretch(4, 0); // Input area fixed height
+  m_mainLayout->setStretch(5, 0); // Separator fixed height
+  m_mainLayout->setStretch(6, 0); // Button fixed height
 
   frame->setLayout(m_mainLayout);
   frame->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
@@ -444,24 +477,25 @@ void BlinkBoardWidget::handleSendMessage() {
   
   // Send message to Node.js backend if connected
   if (m_nodeProcess->state() == QProcess::Running) {
-    // Always send "chat" command, with highlighted components
+    // Always send "chat" command, with highlighted components and mode
     QJsonObject chatMessage;
     chatMessage["command"] = "chat";
     chatMessage["message"] = message;
     chatMessage["timestamp"] = QDateTime::currentMSecsSinceEpoch();
+    chatMessage["mode"] = m_isAskingMode ? "asking" : "testing";
     
     // Include highlighted components if they exist
     if (!m_highlightedComponents.isEmpty()) {
       chatMessage["highlighted_components"] = m_highlightedComponents;
       
-      qDebug() << "Sending chat message with highlighted components context:" << m_highlightedComponents.size() << "components";
+      qDebug() << "Sending chat message with highlighted components context:" << m_highlightedComponents.size() << "components, mode:" << (m_isAskingMode ? "asking" : "testing");
       
       // Clear highlighted components after sending (they've been used as context)
       clearHighlightedComponents();
     } else {
       // Send without highlighted components
       chatMessage["highlighted_components"] = QJsonValue::Undefined;
-      qDebug() << "Sending chat message without highlighted components context";
+      qDebug() << "Sending chat message without highlighted components context, mode:" << (m_isAskingMode ? "asking" : "testing");
     }
     
     QJsonDocument doc(chatMessage);
@@ -1048,4 +1082,26 @@ void BlinkBoardWidget::updateHighlightedComponentsDisplay() {
       m_highlightedComponentsLabel->setStyleSheet("color: #2E8B57; font-weight: bold; padding: 5px; background-color: #f0f8f0; border: 1px solid #90EE90; border-radius: 3px; font-family: 'Droid Sans'; font-size: 10px;");
     }
   }
+}
+
+// Toggle between asking and testing modes
+// Asking mode: User asks questions about the circuit (green button)
+// Testing mode: User requests tests or validation of the circuit (orange button)
+void BlinkBoardWidget::handleModeToggle() {
+  m_isAskingMode = !m_isAskingMode;
+  QString modeText = m_isAskingMode ? "Asking" : "Testing";
+  m_modeToggleButton->setText(modeText);
+  
+  // Update button styling based on mode
+  if (m_isAskingMode) {
+    m_modeToggleButton->setStyleSheet("QPushButton { padding: 5px 10px; background: #4CAF50; color: white; border: 1px solid #45a049; border-radius: 0px; font-family: 'Droid Sans'; font-size: 10px; } QPushButton:hover { background: #45a049; } QPushButton:pressed { background: #3d8b40; }");
+    m_modeIndicatorLabel->setStyleSheet("QLabel { color: #4CAF50; font-weight: bold; padding: 5px; background-color: #f0f8f0; border: 1px solid #4CAF50; border-radius: 3px; font-family: 'Droid Sans'; font-size: 10px; }");
+    m_modeIndicatorLabel->setText("Current Mode: Asking");
+  } else {
+    m_modeToggleButton->setStyleSheet("QPushButton { padding: 5px 10px; background: #FF9800; color: white; border: 1px solid #F57C00; border-radius: 0px; font-family: 'Droid Sans'; font-size: 10px; } QPushButton:hover { background: #F57C00; } QPushButton:pressed { background: #E65100; }");
+    m_modeIndicatorLabel->setStyleSheet("QLabel { color: #FF9800; font-weight: bold; padding: 5px; background-color: #fff8f0; border: 1px solid #FF9800; border-radius: 3px; font-family: 'Droid Sans'; font-size: 10px; }");
+    m_modeIndicatorLabel->setText("Current Mode: Testing");
+  }
+  
+  qDebug() << "Toggled mode to:" << modeText;
 }

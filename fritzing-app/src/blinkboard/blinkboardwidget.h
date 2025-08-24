@@ -58,6 +58,7 @@ protected slots:
   void handleSendMessage();
   void handleMessageReceived(const QString &message);
   void handleUpdateSchematics();
+  void handleModeToggle();
 
 protected:
   QPushButton *m_actionButton;
@@ -80,6 +81,11 @@ protected:
   QPushButton *m_sendButton;
   QPushButton *m_updateSchematicsButton;
   QHBoxLayout *m_inputLayout;
+  
+  // Mode toggle switch
+  QPushButton *m_modeToggleButton;
+  bool m_isAskingMode;
+  QLabel *m_modeIndicatorLabel;
   
   // Highlighted components storage
   QJsonArray m_highlightedComponents;
