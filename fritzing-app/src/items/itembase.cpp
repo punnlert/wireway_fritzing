@@ -1083,11 +1083,10 @@ void ItemBase::mousePressEvent(QGraphicsSceneMouseEvent *event) {
 
 	// Check if this is a breadboard component being clicked
 	if (m_viewID == ViewLayer::BreadboardView) {
-		// Store component data for later use on mouse release
-		// This prevents sending data on every mouse tick during drag operations
-		m_storedComponentData = QJsonObject();
-		m_storedComponentData["component_id"] = QString::number(m_id);
-		m_storedComponentData["component_title"] = title();
+		// Get breadboard pin information and emit signal immediately for single clicks
+		QJsonObject componentData;
+		componentData["component_id"] = QString::number(m_id);
+		componentData["component_title"] = title();
 		
 		// Get actual breadboard pin connections
 		QJsonArray pinsArray;
@@ -1116,21 +1115,9 @@ void ItemBase::mousePressEvent(QGraphicsSceneMouseEvent *event) {
 			}
 		}
 		
-		m_storedComponentData["pins"] = pinsArray;
-	}
-
-	//scene()->setItemIndexMethod(QGraphicsScene::NoIndex);
-	//setCacheMode(QGraphicsItem::DeviceCoordinateCache);
-	QGraphicsSvgItem::mousePressEvent(event);
-}
-
-void ItemBase::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
-{
-	m_rightClickedConnector = nullptr;
-	
-	// Send component data on mouse release when selection is complete
-	if (m_viewID == ViewLayer::BreadboardView && !m_storedComponentData.isEmpty()) {
-		InfoGraphicsView *infoGraphicsView = InfoGraphicsView::getInfoGraphicsView(this);
+		componentData["pins"] = pinsArray;
+		
+		// Emit signal through InfoGraphicsView to MainWindow immediately
 		if (infoGraphicsView) {
 			QWidget *parent = qobject_cast<QWidget*>(infoGraphicsView->parent());
 			while (parent && !qobject_cast<MainWindow*>(parent)) {
@@ -1141,13 +1128,19 @@ void ItemBase::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
 				// Use QMetaObject::invokeMethod to safely emit the signal from a different thread
 				QMetaObject::invokeMethod(mainWindow, "handleBreadboardComponentHighlighted",
 										Qt::QueuedConnection,
-										Q_ARG(QJsonObject, m_storedComponentData));
+										Q_ARG(QJsonObject, componentData));
 			}
 		}
-		
-		// Clear stored data after sending
-		m_storedComponentData = QJsonObject();
 	}
+
+	//scene()->setItemIndexMethod(QGraphicsScene::NoIndex);
+	//setCacheMode(QGraphicsItem::DeviceCoordinateCache);
+	QGraphicsSvgItem::mousePressEvent(event);
+}
+
+void ItemBase::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
+{
+	m_rightClickedConnector = nullptr;
 	
 	// calling parent class so that multiple selection will work
 	// haven't yet discovered any nasty side-effect

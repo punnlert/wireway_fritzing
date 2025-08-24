@@ -400,7 +400,6 @@ protected:
 	QList< QPointer<ItemBase> > m_subparts;
 	bool m_squashShape = false;
 	mutable QPainterPath m_selectionShape;
-	QJsonObject m_storedComponentData; // Store component data for mouse release event
 
 protected:
 	static long nextID;

@@ -1006,26 +1006,6 @@ void BlinkBoardWidget::sendComponentHighlightToBackend(const QJsonObject& compon
   addChatMessage("Component highlight command sent to backend.", false);
 }
 
-void BlinkBoardWidget::sendAllHighlightedComponentsToBackend()
-{
-  if (m_nodeProcess->state() != QProcess::Running) {
-    addChatMessage("Not connected to backend. Cannot send component highlight commands.", false);
-    return;
-  }
-
-  if (m_highlightedComponents.isEmpty()) {
-    return; // Nothing to send
-  }
-
-  // Send highlight commands for all currently highlighted components
-  for (int i = 0; i < m_highlightedComponents.size(); ++i) {
-    QJsonObject component = m_highlightedComponents[i].toObject();
-    sendComponentHighlightToBackend(component);
-  }
-  
-  addChatMessage(QString("Sent %1 component highlight commands to backend.").arg(m_highlightedComponents.size()), false);
-}
-
 void BlinkBoardWidget::handleAnalogReadData(const QJsonObject &event)
 {
   // Parse the analog read data
@@ -1058,12 +1038,12 @@ void BlinkBoardWidget::handleComponentHighlighted(const QJsonObject& componentDa
   qDebug() << "=== COMPONENT HIGHLIGHT DATA RECEIVED ===";
   qDebug() << "Raw JSON data:" << componentData;
   
-  // Store the highlighted component locally
+  // Store the highlighted component locally for context
   addHighlightedComponent(componentData);
   
-  // Send all currently highlighted components to backend
-  // This ensures we send the complete selection state
-  sendAllHighlightedComponentsToBackend();
+  // Send component highlight command to backend to turn on physical board
+  // This is for single component clicks
+  sendComponentHighlightToBackend(componentData);
   
   // Add a chat message to inform the user
   QString title = componentData["component_title"].toString();
@@ -1083,18 +1063,14 @@ void BlinkBoardWidget::handleMultipleComponentsSelected(const QJsonArray& compon
     return;
   }
   
-  // Send highlight commands for all selected components to backend at once
-  // This happens when the user finishes selecting (mouse release)
-  for (int i = 0; i < componentsData.size(); ++i) {
-    QJsonObject component = componentsData[i].toObject();
-    sendComponentHighlightToBackend(component);
-  }
-  
-  // Store the highlighted components locally
+  // Store the highlighted components locally for context (chat/UI purposes)
+  // Do NOT send highlight commands to backend for area selection
   m_highlightedComponents = componentsData;
   
   // Update the display to show highlighted components
   updateHighlightedComponentsDisplay();
+  
+  qDebug() << "Added" << componentsData.size() << "components to context for chat/UI purposes";
 }
 
 void BlinkBoardWidget::handleComponentDeselected(const QString& componentId) {
