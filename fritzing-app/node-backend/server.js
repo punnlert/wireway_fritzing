@@ -223,6 +223,46 @@ const testing_tools = [
   },
   {
     type: "function",
+    name: "add_analog_voltage_test",
+    description:
+      "Choose a specific row that you want to turn high or low and let the student observe the result of the change. The only measuring i/o row that you can use is D2.",
+    parameters: {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        description: { type: "string" },
+        test_group_id: {
+          type: "string",
+          description:
+            "the id of the test group to add the test to. you must provide it every time for it to be added to the correct group. if you don't have any test group available, you can add a test group first by calling the add_test_group function",
+        },
+        jsondata: {
+          type: "object",
+          properties: {
+            output_row: {
+              type: "number",
+              description: "the row which you want to output analog voltage",
+              maximum: 50,
+              minimum: 1,
+            },
+            output_voltage: {
+              type: "number",
+              description: "the voltage you want to output",
+              maximum: 4.5,
+              minimum: 0,
+            },
+          },
+          required: ["output_row", "output_voltage"],
+          additionalProperties: false,
+        },
+      },
+      required: ["title", "description", "jsondata", "test_group_id"],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    type: "function",
     name: "add_switch_connection_suggestion",
     description:
       "Sometimes, the student might mistakenly connect some pins in the wrong hole. This is how we suggest them to fix it.",
@@ -733,6 +773,54 @@ function add_high_low_voltage_test({
   };
 }
 
+function add_analog_voltage_test({
+  title,
+  description,
+  jsondata,
+  test_group_id,
+}) {
+  if (testGroups.length > 0) {
+    const groupIndex = testGroups.findIndex(
+      (group) => group.id === test_group_id
+    );
+
+    if (groupIndex === -1) {
+      console.log("❌ Test group not found");
+      return {
+        successfully_added: false,
+        error: "Test group not found",
+      };
+    }
+
+    const newTest = {
+      id: `test_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      type: "analog_voltage",
+      title: title,
+      description: description,
+      jsondata: jsondata || {},
+      output_row: jsondata?.output_row || 1,
+      output_voltage: jsondata?.output_voltage || 0,
+      completed: false,
+    };
+
+    testGroups[groupIndex].tests.push(newTest);
+
+    console.log(
+      `✅ Added analog voltage test "${title}" to group "${testGroups[groupIndex].title}"`
+    );
+
+    return {
+      successfully_added: true,
+      error: null,
+    };
+  }
+
+  return {
+    successfully_added: false,
+    error: "No test groups available to add test to",
+  };
+}
+
 function add_switch_connection_suggestion({
   title,
   description,
@@ -919,6 +1007,22 @@ class EventHandler extends EventEmitter {
               response.arguments
             );
             const result = add_high_low_voltage_test({
+              title,
+              description,
+              jsondata,
+              test_group_id,
+            });
+
+            openai_chat_history.push({
+              type: "function_call_output",
+              call_id: response.call_id,
+              output: JSON.stringify(result),
+            });
+          } else if (response.name === "add_analog_voltage_test") {
+            const { title, description, jsondata, test_group_id } = JSON.parse(
+              response.arguments
+            );
+            const result = add_analog_voltage_test({
               title,
               description,
               jsondata,
@@ -1650,6 +1754,22 @@ async function processCommand(command) {
         timestamp: Date.now(),
       };
 
+    case "request_voltage_output":
+      const { output_row, output_voltage } = command;
+      console.log(`🔘 Received voltage output request for: ${output_row}`);
+      console.log(`Voltage: ${output_voltage}`);
+
+      write_json_to_port({
+        cmd: "setV",
+        value: output_voltage * 1000,
+      });
+
+      return {
+        status: "success",
+        message: "Voltage output requested",
+        timestamp: Date.now(),
+      };
+
     case "request_high_low":
       try {
         const { blinkboard_digital_row, voltage } = command;
@@ -1859,6 +1979,14 @@ testGroups = [
             { voltage: "high", duration: 1000 },
           ],
         },
+        completed: false,
+      },
+      {
+        id: "av_demo_1",
+        type: "analog_voltage",
+        title: "Output 1.5V to row 1",
+        description: "Output 1.5V to row 1",
+        jsondata: { output_row: 1, output_voltage: 1.5 },
         completed: false,
       },
     ],

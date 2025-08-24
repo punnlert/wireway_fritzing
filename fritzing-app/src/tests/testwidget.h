@@ -54,6 +54,7 @@ signals:
     void testGroupsRequested();
     void blinkBoardConnectionRequested();
     void testsRequested();
+    void voltageOutputRequested(const QJsonObject &test);
 
 private:
     void setupUI();
@@ -63,6 +64,7 @@ private:
     void createMeasureVoltageTestDisplay(const QJsonObject &test, QWidget *parent, QVBoxLayout *parentLayout);
     QLineEdit* createHighLowVoltageTestDisplay(const QJsonObject &test, QWidget *parent, QVBoxLayout *parentLayout);
     void createSwitchConnectionSuggestionTestDisplay(const QJsonObject &test, QWidget *parent, QVBoxLayout *parentLayout);
+    QLineEdit* createAnalogVoltageTestDisplay(const QJsonObject &test, QWidget *parent, QVBoxLayout *parentLayout);
     void clearCards();
     
     // Playhead animation methods

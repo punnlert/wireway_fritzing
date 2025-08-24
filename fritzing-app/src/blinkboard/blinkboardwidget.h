@@ -41,6 +41,7 @@ public slots:
   void handleBlinkRequest(const QJsonObject &test, const QString &action);
   void handleHighLowVoltageRequest(const QJsonObject &voltageCommand);
   void handleMeasureRequest(const QJsonObject &test);
+  void handleVoltageOutputRequest(const QJsonObject &test);
   void handleComponentHighlighted(const QJsonObject& componentData);
   void handleMultipleComponentsSelected(const QJsonArray& componentsData);
   void handleComponentDeselected(const QString& componentId);

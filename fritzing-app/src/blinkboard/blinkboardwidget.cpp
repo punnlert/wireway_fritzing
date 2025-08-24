@@ -982,6 +982,34 @@ void BlinkBoardWidget::handleMeasureRequest(const QJsonObject &test)
   addChatMessage("Measure command sent to backend. Collecting voltage data...", false);
 }
 
+void BlinkBoardWidget::handleVoltageOutputRequest(const QJsonObject &test)
+{
+  if (m_nodeProcess->state() != QProcess::Running) {
+    addChatMessage("Not connected to backend. Cannot send voltage output command.", false);
+    return;
+  }
+
+  // Extract voltage output data from the test
+  QJsonObject jsondata = test["jsondata"].toObject();
+  double outputVoltage = jsondata["output_voltage"].toDouble();
+  int outputRow = jsondata["output_row"].toInt();
+
+  // Create command to send voltage output request to backend
+  QJsonObject jsonCommand;
+  jsonCommand["command"] = "request_voltage_output";
+  jsonCommand["output_row"] = outputRow;
+  jsonCommand["output_voltage"] = outputVoltage;
+  jsonCommand["timestamp"] = QDateTime::currentMSecsSinceEpoch();
+  
+  QJsonDocument doc(jsonCommand);
+  QString jsonString = doc.toJson(QJsonDocument::Compact);
+  
+  qDebug() << "⚡ Sending voltage output request to Node.js backend:" << jsonString.left(200) + "...";
+  m_nodeProcess->write(jsonString.toUtf8() + "\n");
+  
+  addChatMessage(QString("Voltage output request sent: %1V to row %2").arg(outputVoltage, 0, 'f', 1).arg(outputRow), false);
+}
+
 void BlinkBoardWidget::sendComponentHighlightToBackend(const QJsonObject& componentData)
 {
   if (m_nodeProcess->state() != QProcess::Running) {

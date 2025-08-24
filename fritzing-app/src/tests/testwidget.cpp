@@ -231,6 +231,15 @@ void TestWidget::onSubmitTestResults(const QString &groupId, const QList<QLineEd
                 testResult["answer"] = "";
                 qDebug() << "⚠️ No input field found for high/low voltage test";
             }
+        } else if (testType == "analog_voltage") {
+            // Get the answer from input field for analog voltage test
+            if (i < testInputs.size() && testInputs[i]) {
+                testResult["answer"] = testInputs[i]->text();
+                qDebug() << "🔌 Analog voltage test observation:" << testInputs[i]->text();
+            } else {
+                testResult["answer"] = "";
+                qDebug() << "⚠️ No input field found for analog voltage test";
+            }
         } else {
             // Get the answer from input field if available, otherwise empty string
             if (i < testInputs.size() && testInputs[i]) {
@@ -338,6 +347,12 @@ void TestWidget::createTestGroupCard(const QJsonObject &testGroup)
                 testData.append(test);
             } else if (testType == "high_low_voltage") {
                 QLineEdit* input = createHighLowVoltageTestDisplay(test, card, cardLayout);
+                if (input) {
+                    testInputs.append(input);
+                    testData.append(test);
+                }
+            } else if (testType == "analog_voltage") {
+                QLineEdit* input = createAnalogVoltageTestDisplay(test, card, cardLayout);
                 if (input) {
                     testInputs.append(input);
                     testData.append(test);
@@ -736,6 +751,94 @@ void TestWidget::createSwitchConnectionSuggestionTestDisplay(const QJsonObject &
     qDebug() << "✅ Switch connection suggestion test displayed in TestWidget:" << test["title"].toString();
 }
 
+QLineEdit* TestWidget::createAnalogVoltageTestDisplay(const QJsonObject &test, QWidget *parent, QVBoxLayout *parentLayout)
+{
+    // Create test container widget with consistent styling
+    QFrame *testWidget = new QFrame(parent);
+    testWidget->setStyleSheet("QFrame { background-color: #d6d6d6; padding: 5px; margin: 5px; }");
+    
+    QVBoxLayout *testLayout = new QVBoxLayout(testWidget);
+    testLayout->setContentsMargins(10, 10, 10, 10);
+    testLayout->setSpacing(8);
+    
+    // Test title - consistent with other tests
+    QLabel *titleLabel = new QLabel(test["title"].toString());
+    titleLabel->setStyleSheet("QLabel { font-family: 'Droid Sans'; font-size: 12px; font-weight: bold; color: #333; }");
+    testLayout->addWidget(titleLabel);
+    
+    // Test description - consistent with other tests
+    QLabel *descLabel = new QLabel(test["description"].toString());
+    descLabel->setStyleSheet("QLabel { font-family: 'Droid Sans'; font-size: 10px; color: #666; }");
+    descLabel->setWordWrap(true);
+    testLayout->addWidget(descLabel);
+    
+    // Middle section - voltage output information
+    QJsonObject jsondata = test["jsondata"].toObject();
+    double outputVoltage = jsondata["output_voltage"].toDouble();
+    int outputRow = jsondata["output_row"].toInt();
+    
+    QString voltageText = QString("Output %1 V to row %2").arg(outputVoltage, 0, 'f', 1).arg(outputRow);
+    
+    QLabel *voltageLabel = new QLabel(voltageText);
+    voltageLabel->setStyleSheet("QLabel { font-family: 'Droid Sans'; font-size: 11px; color: #333; background-color: #f0f0f0; padding: 8px; border: 1px solid #ccc; border-radius: 3px; }");
+    voltageLabel->setWordWrap(true);
+    voltageLabel->setAlignment(Qt::AlignCenter);
+    testLayout->addWidget(voltageLabel);
+    
+    // Button area (bottom section) - consistent with other tests
+    QHBoxLayout *buttonLayout = new QHBoxLayout();
+    buttonLayout->setSpacing(10);
+    
+    // Blink button - consistent with other tests
+    QPushButton *blinkButton = new QPushButton("Blink", testWidget);
+    blinkButton->setStyleSheet("QPushButton { padding: 6px 12px; background: #f23926; color: white; border: none; border-radius: 3px; font-family: 'Droid Sans'; font-size: 10px; } QPushButton:hover { background: #d32f2f; } QPushButton:pressed { background: #b71c1c; }");
+    blinkButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    
+    // Connect blink button
+    connect(blinkButton, &QPushButton::clicked, [this, test]() {
+        qDebug() << "🔘 Blink button clicked for analog voltage test:" << test["title"].toString();
+        emit blinkRequested(test, "blink");
+    });
+    
+    // Start Apply Voltage button
+    QPushButton *applyVoltageButton = new QPushButton("Start Apply Voltage", testWidget);
+    applyVoltageButton->setStyleSheet("QPushButton { padding: 6px 12px; background: #4CAF50; color: white; border: none; border-radius: 3px; font-family: 'Droid Sans'; font-size: 10px; } QPushButton:hover { background: #45a049; } QPushButton:pressed { background: #3d8b40; }");
+    applyVoltageButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    
+    // Connect apply voltage button (placeholder for now)
+    connect(applyVoltageButton, &QPushButton::clicked, [this, test]() {
+        qDebug() << "⚡ Start Apply Voltage button clicked for analog voltage test:" << test["title"].toString();
+        // Emit voltage output request signal
+        emit voltageOutputRequested(test);
+    });
+    
+    buttonLayout->addWidget(blinkButton);
+    buttonLayout->addWidget(applyVoltageButton);
+    buttonLayout->addStretch(); // Push buttons to the left
+    
+    testLayout->addLayout(buttonLayout);
+    
+    // Add some spacing before the observation input
+    testLayout->addSpacing(15);
+    
+    // Observation input area (similar to self_observe_test)
+    QLabel *observationLabel = new QLabel("Describe your observation:");
+    observationLabel->setStyleSheet("QLabel { font-family: 'Droid Sans'; font-size: 10px; font-weight: bold; color: #333; }");
+    testLayout->addWidget(observationLabel);
+    
+    QLineEdit *observationInput = new QLineEdit(testWidget);
+    observationInput->setPlaceholderText("What did you observe?");
+    observationInput->setStyleSheet("QLineEdit { padding: 8px; border: 1px solid #b1b1b1; border-radius: 3px; background: #ececec; color: #323232; font-family: 'Droid Sans'; font-size: 10px; } QLineEdit:focus { border: 1px solid #f23926; }");
+    observationInput->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    testLayout->addWidget(observationInput);
+    
+    // Add test widget to parent layout
+    parentLayout->addWidget(testWidget);
+    
+    qDebug() << "✅ Analog voltage test displayed in TestWidget:" << test["title"].toString();
+    return observationInput; // Return the input field
+}
+
 void TestWidget::handleVoltageDataReceived(const QJsonObject &voltageData)
 {
     qDebug() << "📊 TestWidget received voltage data:" << voltageData;
@@ -1029,7 +1132,7 @@ QLineEdit* TestWidget::createHighLowVoltageTestDisplay(const QJsonObject &test, 
     testLayout->addWidget(observationLabel);
     
     QLineEdit *observationInput = new QLineEdit(testWidget);
-    observationInput->setPlaceholderText("Enter your observation here...");
+    observationInput->setPlaceholderText("What did you observe?");
     observationInput->setStyleSheet("QLineEdit { padding: 8px; border: 1px solid #b1b1b1; border-radius: 3px; background: #ececec; color: #323232; font-family: 'Droid Sans'; font-size: 10px; } QLineEdit:focus { border: 1px solid #f23926; }");
     observationInput->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     testLayout->addWidget(observationInput);

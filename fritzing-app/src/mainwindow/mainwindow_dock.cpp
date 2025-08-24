@@ -273,6 +273,10 @@ void MainWindow::initDock() {
   connect(m_testWidget, &TestWidget::measureRequested, 
           m_blinkboardWidget, &BlinkBoardWidget::handleMeasureRequest);
 
+  // Connect TestWidget's voltage output request signal to BlinkBoardWidget's voltage output method
+  connect(m_testWidget, &TestWidget::voltageOutputRequested, 
+          m_blinkboardWidget, &BlinkBoardWidget::handleVoltageOutputRequest);
+
   // Connect BlinkBoardWidget's voltage data signal to TestWidget's voltage data handler
   connect(m_blinkboardWidget, &BlinkBoardWidget::voltageDataReceived, 
           m_testWidget, &TestWidget::handleVoltageDataReceived);
