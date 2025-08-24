@@ -37,6 +37,7 @@ public slots:
     void handleTestGroupsUpdated(const QJsonArray &testGroups);
     void handleVoltageDataReceived(const QJsonObject &voltageData);
     void handleMeasureRequest(const QJsonObject &test);
+    void stopAllPlayheadAnimations();
 
 private slots:
     void onConnectBlinkBoardClicked();
@@ -48,6 +49,7 @@ signals:
     void testResultsSubmitted(const QString &groupId, const QJsonObject &results);
     void testResultsSubmittedToBackend(const QString &groupId, const QJsonObject &results);
     void blinkRequested(const QJsonObject &test, const QString &action);
+    void highLowVoltageRequested(const QJsonObject &voltageCommand);
     void measureRequested(const QJsonObject &test);
     void testGroupsRequested();
     void blinkBoardConnectionRequested();
@@ -98,6 +100,7 @@ private:
     QMap<QString, int> m_playheadPositions;
     QMap<QString, QJsonArray> m_playheadPatterns;
     QMap<QString, int> m_playheadTotalDurations;
+    QMap<QString, QString> m_currentVoltageStates;
     
     // Backend connection
     QPushButton *m_connectButton;

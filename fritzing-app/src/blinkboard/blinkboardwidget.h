@@ -39,6 +39,7 @@ public slots:
   void requestTestsFromBackend();
   void submitTestResultsToBackend(const QString &groupId, const QJsonObject &results);
   void handleBlinkRequest(const QJsonObject &test, const QString &action);
+  void handleHighLowVoltageRequest(const QJsonObject &voltageCommand);
   void handleMeasureRequest(const QJsonObject &test);
   void handleComponentHighlighted(const QJsonObject& componentData);
   void handleMultipleComponentsSelected(const QJsonArray& componentsData);

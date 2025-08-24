@@ -937,6 +937,29 @@ void BlinkBoardWidget::handleBlinkRequest(const QJsonObject &test, const QString
   addChatMessage("Blink command sent to backend.", false);
 }
 
+void BlinkBoardWidget::handleHighLowVoltageRequest(const QJsonObject &voltageCommand)
+{
+  if (m_nodeProcess->state() != QProcess::Running) {
+    addChatMessage("Not connected to backend. Cannot send voltage command.", false);
+    return;
+  }
+
+  // Create command to send high/low voltage request to backend
+  QJsonObject jsonCommand;
+  jsonCommand["command"] = "request_high_low";
+  jsonCommand["blinkboard_digital_row"] = voltageCommand["blinkboard_digital_row"].toString();
+  jsonCommand["voltage"] = voltageCommand["voltage"].toString();
+  jsonCommand["timestamp"] = QDateTime::currentMSecsSinceEpoch();
+  
+  QJsonDocument doc(jsonCommand);
+  QString jsonString = doc.toJson(QJsonDocument::Compact);
+  
+  qDebug() << "🔌 Sending high/low voltage request to Node.js backend:" << jsonString.left(200) + "...";
+  m_nodeProcess->write(jsonString.toUtf8() + "\n");
+  
+  addChatMessage("Voltage command sent to backend.", false);
+}
+
 void BlinkBoardWidget::handleMeasureRequest(const QJsonObject &test)
 {
   if (m_nodeProcess->state() != QProcess::Running) {

@@ -95,6 +95,9 @@ void TestWidget::setupConnections()
 
 void TestWidget::updateTestGroups(const QJsonArray &testGroups)
 {
+    // Stop all playhead animations before updating
+    stopAllPlayheadAnimations();
+    
     m_testGroups = testGroups;
     clearCards();
     
@@ -112,6 +115,8 @@ void TestWidget::addTestGroup(const QJsonObject &testGroup)
 
 void TestWidget::clearTestGroups()
 {
+    // Stop all playhead animations before clearing
+    stopAllPlayheadAnimations();
     m_testGroups = QJsonArray();
     clearCards();
 }
@@ -258,6 +263,7 @@ void TestWidget::clearCards()
     m_playheadPositions.clear();
     m_playheadPatterns.clear();
     m_playheadTotalDurations.clear();
+    m_currentVoltageStates.clear();
     
     // Reset measuring state
     m_currentMeasuringTestId.clear();
@@ -321,7 +327,7 @@ void TestWidget::createTestGroupCard(const QJsonObject &testGroup)
             } else if (testType == "switch_connection_suggestion") {
                 createSwitchConnectionSuggestionTestDisplay(test, card, cardLayout);
                 testData.append(test);
-            } else if (testType == "add_high_low_voltage_test") {
+            } else if (testType == "high_low_voltage") {
                 createHighLowVoltageTestDisplay(test, card, cardLayout);
                 testData.append(test);
             } else {
@@ -906,7 +912,7 @@ void TestWidget::createHighLowVoltageTestDisplay(const QJsonObject &test, QWidge
     // Create axes
     QValueAxis *axisY = new QValueAxis();
     axisY->setTitleText("Voltage (V)");
-    axisY->setRange(0, 5);
+    axisY->setRange(0, 8);
     axisY->setLabelFormat("%.1f");
     axisY->setTickCount(6);
     
@@ -973,15 +979,31 @@ void TestWidget::createHighLowVoltageTestDisplay(const QJsonObject &test, QWidge
             if (!pattern.isEmpty()) {
                 startPlayheadAnimation(testId, pattern);
             } else {
-                qDebug() << "⚠️ No pattern data found for test:" << testId;
+                qDebug() << "⚠️ Test ID is empty, cannot start animation";
             }
         } else {
             qDebug() << "⚠️ Test ID is empty, cannot start animation";
         }
     });
     
+    // Stop Sequence button
+    QPushButton *stopSequenceButton = new QPushButton("Stop", testWidget);
+    stopSequenceButton->setStyleSheet("QPushButton { padding: 6px 12px; background: #f44336; color: white; border: none; border-radius: 3px; font-family: 'Droid Sans'; font-size: 10px; } QPushButton:hover { background: #da190b; } QPushButton:pressed { background: #c62828; }");
+    stopSequenceButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    
+    // Connect stop sequence button - stops playhead animation
+    connect(stopSequenceButton, &QPushButton::clicked, [this, test]() {
+        qDebug() << "⏹️ Stop Sequence button clicked for high/low voltage test:" << test["title"].toString();
+        
+        QString testId = test["id"].toString();
+        if (!testId.isEmpty()) {
+            stopPlayheadAnimation(testId);
+        }
+    });
+    
     buttonLayout->addWidget(blinkButton);
     buttonLayout->addWidget(playSequenceButton);
+    buttonLayout->addWidget(stopSequenceButton);
     buttonLayout->addStretch(); // Push buttons to the left
     
     testLayout->addLayout(buttonLayout);
@@ -1023,6 +1045,45 @@ void TestWidget::startPlayheadAnimation(const QString &testId, const QJsonArray 
     m_playheadTotalDurations[testId] = totalDuration;
     m_playheadPositions[testId] = 0;
     
+    // Initialize voltage state to "low" (default state)
+    m_currentVoltageStates[testId] = "low";
+    
+    // Send initial voltage command if the pattern starts with "high"
+    if (!pattern.isEmpty()) {
+        QJsonObject firstPattern = pattern.first().toObject();
+        QString firstVoltage = firstPattern["voltage"].toString();
+        if (firstVoltage == "high") {
+            // Send initial high voltage command
+            QString blinkboardDigitalRow;
+            for (const QJsonValue &groupValue : m_testGroups) {
+                QJsonObject group = groupValue.toObject();
+                QJsonArray tests = group["tests"].toArray();
+                
+                for (const QJsonValue &testValue : tests) {
+                    QJsonObject test = testValue.toObject();
+                    if (test["id"].toString() == testId) {
+                        QJsonObject jsondata = test["jsondata"].toObject();
+                        blinkboardDigitalRow = jsondata["blinkboard_digital_row"].toString();
+                        break;
+                    }
+                }
+                if (!blinkboardDigitalRow.isEmpty()) break;
+            }
+            
+            if (!blinkboardDigitalRow.isEmpty()) {
+                QJsonObject voltageCommand;
+                voltageCommand["cmd"] = "request_high_low";
+                voltageCommand["blinkboard_digital_row"] = blinkboardDigitalRow;
+                voltageCommand["voltage"] = "high";
+                
+                emit highLowVoltageRequested(voltageCommand);
+                m_currentVoltageStates[testId] = "high";
+                
+                qDebug() << "🔌 Sending initial high voltage command for pin:" << blinkboardDigitalRow << "at animation start";
+            }
+        }
+    }
+    
     // Create and start timer
     QTimer *timer = new QTimer(this);
     timer->setInterval(50); // Update every 50ms for smooth animation
@@ -1056,8 +1117,101 @@ void TestWidget::updatePlayheadPosition(const QString &testId)
     
     // Check if animation is complete
     if (currentPos >= totalDuration) {
+        // Send final low voltage command before stopping only if current state is not already low
+        if (m_testCharts.contains(testId)) {
+            QString currentState = m_currentVoltageStates.value(testId, "low");
+            if (currentState != "low") {
+                QString blinkboardDigitalRow;
+                for (const QJsonValue &groupValue : m_testGroups) {
+                    QJsonObject group = groupValue.toObject();
+                    QJsonArray tests = group["tests"].toArray();
+                    
+                    for (const QJsonValue &testValue : tests) {
+                        QJsonObject test = testValue.toObject();
+                        if (test["id"].toString() == testId) {
+                            QJsonObject jsondata = test["jsondata"].toObject();
+                            blinkboardDigitalRow = jsondata["blinkboard_digital_row"].toString();
+                            break;
+                        }
+                    }
+                    if (!blinkboardDigitalRow.isEmpty()) break;
+                }
+                
+                if (!blinkboardDigitalRow.isEmpty()) {
+                    // Send low voltage command to turn off
+                    QJsonObject voltageCommand;
+                    voltageCommand["cmd"] = "request_high_low";
+                    voltageCommand["blinkboard_digital_row"] = blinkboardDigitalRow;
+                    voltageCommand["voltage"] = "low";
+                    
+                    emit highLowVoltageRequested(voltageCommand);
+                    m_currentVoltageStates[testId] = "low";
+                    qDebug() << "🔌 Sending final low voltage command for pin:" << blinkboardDigitalRow << "at animation completion";
+                }
+            }
+        }
+        
         stopPlayheadAnimation(testId);
         return;
+    }
+    
+    // Determine current voltage level based on playhead position
+    QString currentVoltage = "low"; // Default to low
+    if (m_playheadPatterns.contains(testId)) {
+        QJsonArray pattern = m_playheadPatterns[testId];
+        int accumulatedTime = 0;
+        
+        for (const QJsonValue &patternValue : pattern) {
+            QJsonObject p = patternValue.toObject();
+            int duration = p["duration"].toInt();
+            QString voltage = p["voltage"].toString();
+            
+            if (currentPos >= accumulatedTime && currentPos < accumulatedTime + duration) {
+                currentVoltage = voltage;
+                break;
+            }
+            accumulatedTime += duration;
+        }
+    }
+    
+    // Send voltage command to backend only when voltage level changes
+    if (m_testCharts.contains(testId)) {
+        // Check if voltage level has changed
+        QString previousVoltage = m_currentVoltageStates.value(testId, "low");
+        if (currentVoltage != previousVoltage) {
+            // Get the test data to find the blinkboard_digital_row
+            QString blinkboardDigitalRow;
+            for (const QJsonValue &groupValue : m_testGroups) {
+                QJsonObject group = groupValue.toObject();
+                QJsonArray tests = group["tests"].toArray();
+                
+                for (const QJsonValue &testValue : tests) {
+                    QJsonObject test = testValue.toObject();
+                    if (test["id"].toString() == testId) {
+                        QJsonObject jsondata = test["jsondata"].toObject();
+                        blinkboardDigitalRow = jsondata["blinkboard_digital_row"].toString();
+                        break;
+                    }
+                }
+                if (!blinkboardDigitalRow.isEmpty()) break;
+            }
+            
+            if (!blinkboardDigitalRow.isEmpty()) {
+                // Create the voltage command
+                QJsonObject voltageCommand;
+                voltageCommand["cmd"] = "request_high_low";
+                voltageCommand["blinkboard_digital_row"] = blinkboardDigitalRow;
+                voltageCommand["voltage"] = currentVoltage;
+                
+                // Send to backend via the high/low voltage signal
+                emit highLowVoltageRequested(voltageCommand);
+                
+                // Update the stored voltage state
+                m_currentVoltageStates[testId] = currentVoltage;
+                
+                qDebug() << "🔌 Voltage changed from" << previousVoltage << "to" << currentVoltage << "for pin:" << blinkboardDigitalRow << "at position:" << currentPos << "ms";
+            }
+        }
     }
     
     // Draw playhead as vertical line
@@ -1097,11 +1251,57 @@ void TestWidget::stopPlayheadAnimation(const QString &testId)
         }
     }
     
+    // Send final low voltage command to turn off the output only if current state is not already low
+    if (m_testCharts.contains(testId)) {
+        QString currentState = m_currentVoltageStates.value(testId, "low");
+        if (currentState != "low") {
+            QString blinkboardDigitalRow;
+            for (const QJsonValue &groupValue : m_testGroups) {
+                QJsonObject group = groupValue.toObject();
+                QJsonArray tests = group["tests"].toArray();
+                
+                for (const QJsonValue &testValue : tests) {
+                    QJsonObject test = testValue.toObject();
+                    if (test["id"].toString() == testId) {
+                        QJsonObject jsondata = test["jsondata"].toObject();
+                        blinkboardDigitalRow = jsondata["blinkboard_digital_row"].toString();
+                        break;
+                    }
+                }
+                if (!blinkboardDigitalRow.isEmpty()) break;
+            }
+            
+            if (!blinkboardDigitalRow.isEmpty()) {
+                // Send low voltage command to turn off
+                QJsonObject voltageCommand;
+                voltageCommand["cmd"] = "request_high_low";
+                voltageCommand["blinkboard_digital_row"] = blinkboardDigitalRow;
+                voltageCommand["voltage"] = "low";
+                
+                emit highLowVoltageRequested(voltageCommand);
+                m_currentVoltageStates[testId] = "low";
+                qDebug() << "🔌 Sending final low voltage command for pin:" << blinkboardDigitalRow << "to turn off output";
+            }
+        }
+    }
+    
     m_playheadPositions.remove(testId);
     m_playheadPatterns.remove(testId);
     m_playheadTotalDurations.remove(testId);
+    m_currentVoltageStates.remove(testId);
     
     qDebug() << "⏹️ Stopped playhead animation for test:" << testId;
+}
+
+void TestWidget::stopAllPlayheadAnimations()
+{
+    // Stop all running playhead animations
+    QStringList testIds = m_playheadTimers.keys();
+    for (const QString &testId : testIds) {
+        stopPlayheadAnimation(testId);
+    }
+    
+    qDebug() << "⏹️ Stopped all playhead animations";
 }
 
 

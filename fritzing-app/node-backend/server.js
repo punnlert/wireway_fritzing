@@ -178,10 +178,12 @@ const testing_tools = [
               type: "string",
               description:
                 "you can decide by yourself which digital row to use for to administer the voltage. this is the blinkboard built-in digital rows",
-              enum: ["d0", "d1"],
+              enum: ["D0", "D1"],
             },
             high_low_pattern: {
               type: "array",
+              description:
+                "you can create your own pattern of high and low voltage that changes with time. because maybe you want to try some hypothesis out that requires pattern. If you simple want to turn it high or low, then simply add one component into the array",
               items: {
                 type: "object",
                 properties: {
@@ -1280,7 +1282,6 @@ function blink_component(pins, pattern) {
     }
   }
 
-  // Reset after highlighting
   setTimeout(() => {
     if (leds.length > 0) {
       for (const led of leds) {
@@ -1303,9 +1304,6 @@ function blink_component(pins, pattern) {
 }
 
 function request_voltage_data() {
-  write_json_to_port({
-    cmd: "reset",
-  });
   write_json_to_port({
     cmd: "analogRead",
     sample: 5,
@@ -1475,14 +1473,6 @@ async function processCommand(command) {
         timestamp: Date.now(),
       };
 
-    case "fileOperation":
-      // Example of a more complex operation
-      return {
-        status: "success",
-        message: "File operation completed",
-        timestamp: Date.now(),
-      };
-
     case "update_schematics":
       try {
         schematics = await update_schematics(command.netlist);
@@ -1534,58 +1524,62 @@ async function processCommand(command) {
         console.log(`Action: ${action}`);
         console.log(`Test data:`, test);
 
+        let rows = [];
+
         if (test.type === "self_observe") {
-          blink_rows(test.jsondata.row, "blink");
+          const { row } = test.jsondata;
+          rows.push(row);
+          blink_rows(row, "blink");
         } else if (test.type === "measure_voltage") {
-          blink_command_pin(test.jsondata.blinkboard_adc_row, "blink");
-          blink_row(test.jsondata.measure_row, "blink");
+          const { blinkboard_adc_row, measure_row } = test.jsondata;
+          rows.push(blinkboard_adc_row);
+          rows.push(measure_row);
+          blink_command_pin(blinkboard_adc_row, "blink");
+          blink_row(measure_row, "blink");
         } else if (test.type === "switch_connection_suggestion") {
           // INSERT_YOUR_CODE
           // Determine if row_from is a number (row) or a command pin (like 'a0', 'd1', etc.)
-          if (!isNaN(Number(test.jsondata.row_from))) {
-            blink_row(Number(test.jsondata.row_from), "on");
+          const { row_from, row_to } = test.jsondata;
+          rows.push(row_from);
+          rows.push(row_to);
+
+          if (!isNaN(Number(row_from))) {
+            blink_row(Number(row_from), "on");
           } else {
-            blink_command_pin(test.jsondata.row_from, "on");
+            blink_command_pin(row_from, "on");
           }
 
-          if (!isNaN(Number(test.jsondata.row_to))) {
-            blink_row(Number(test.jsondata.row_to), "blink2");
+          if (!isNaN(Number(row_to))) {
+            blink_row(Number(row_to), "blink2");
           } else {
-            blink_command_pin(test.jsondata.row_to, "blink2");
+            blink_command_pin(row_to, "blink2");
           }
-          // blink_row(test.jsondata.row_from, "on");
-          // blink_row(test.jsondata.row_to, "blink2");
-        } else if (test.type === "add_high_low_voltage_test") {
-          // Handle high/low voltage test
-          console.log(`🔘 Processing high/low voltage test: ${test.title}`);
-          console.log(`Test data:`, test.jsondata);
+        } else if (test.type === "high_low_voltage") {
+          // INSERT_YOUR_CODE
+          // Determine if high_low_row is a number (row) or a command pin (like 'a0', 'd1', etc.)
+          const { high_low_row, blinkboard_digital_row } = test.jsondata;
+          console.log("high_low_row", high_low_row);
+          console.log("blinkboard_digital_row", blinkboard_digital_row);
+          rows.push(high_low_row);
+          rows.push(blinkboard_digital_row.toLowerCase());
 
-          // Extract the high/low pattern from the test data
-          const { high_low_pattern, high_low_row, blinkboard_digital_row } =
-            test.jsondata;
-
-          // For now, just blink the specified row to indicate the test is active
-          // Later, this can be enhanced to play the full sequence
           if (high_low_row && !isNaN(Number(high_low_row))) {
             blink_row(Number(high_low_row), "blink");
-            console.log(
-              `🔘 Blinking row ${high_low_row} for high/low voltage test`
-            );
           }
 
-          // Also blink the digital command pin if specified
           if (blinkboard_digital_row) {
-            blink_command_pin(blinkboard_digital_row, "blink");
-            console.log(
-              `🔘 Blinking digital pin ${blinkboard_digital_row} for high/low voltage test`
-            );
+            blink_command_pin(blinkboard_digital_row.toLowerCase(), "blink");
           }
         }
 
         setTimeout(() => {
-          write_json_to_port({
-            cmd: "reset",
-          });
+          for (const row of rows) {
+            if (!isNaN(Number(row))) {
+              blink_row(Number(row), "off");
+            } else {
+              blink_command_pin(row, "off");
+            }
+          }
         }, 5000);
 
         return {
@@ -1668,28 +1662,34 @@ async function processCommand(command) {
         timestamp: Date.now(),
       };
 
-    // case "add_test_group":
-    //   // Add a new test group to the collection
-    //   const { testGroupData } = command;
-    //   if (testGroupData) {
-    //     const newTestGroup = {
-    //       id: Date.now().toString(), // Simple ID generation as string
-    //       ...testGroupData,
-    //       timestamp: Date.now(),
-    //     };
-    //     testGroups.push(newTestGroup);
-    //     return {
-    //       status: "success",
-    //       message: "Test group added successfully",
-    //       testGroup: newTestGroup,
-    //       timestamp: Date.now(),
-    //     };
-    //   } else {
-    //     return createErrorResponse(
-    //       new Error("No test group data provided"),
-    //       365
-    //     );
-    //   }
+    case "request_high_low":
+      try {
+        const { blinkboard_digital_row, voltage } = command;
+        console.log(
+          `🔘 Received high/low request for: ${blinkboard_digital_row}`
+        );
+        console.log(`Voltage: ${voltage}`);
+
+        if (voltage === "high") {
+          write_json_to_port({
+            cmd: "setHigh",
+            pin: blinkboard_digital_row,
+          });
+        } else if (voltage === "low") {
+          write_json_to_port({
+            cmd: "setLow",
+            pin: blinkboard_digital_row,
+          });
+        }
+
+        return {
+          status: "success",
+          message: "High/Low requested",
+          timestamp: Date.now(),
+        };
+      } catch (error) {
+        return createErrorResponse(error, 1000); // Line number for request_high_low
+      }
 
     case "get_serial_ports":
       // Refresh and return available serial ports
@@ -1803,80 +1803,79 @@ process.on("unhandledRejection", (reason, promise) => {
 
 // Initialize with some sample test groups
 testGroups = [
-  {
-    id: "1",
-    title: "Circuit Validation Tests",
-    description:
-      "Basic validation tests for circuit components and connections",
-    tests: [
-      // {
-      //   name: "Component Connection Test",
-      //   description: "Verify all components are properly connected",
-      // },
-      // {
-      //   name: "Power Supply Test",
-      //   description: "Check power supply connections and voltage levels",
-      // },
-      // {
-      //   name: "Signal Flow Test",
-      //   description: "Validate signal paths through the circuit",
-      // },
-      {
-        id: "so_demo_1",
-        type: "self_observe",
-        title: "When you press the button, what does the LED do?",
-        description:
-          "Press and release the button a few times and describe the LED behavior.",
-        jsondata: { row: [10] },
-        userObservation: "",
-        completed: false,
-      },
-      {
-        id: "mv_demo_1",
-        type: "measure_voltage",
-        title: "Measure voltage at row 15 using A0",
-        description:
-          "Rotate the potentiometer from end to end while measuring the voltage.",
-        jsondata: { blinkboard_adc_row: "a0", measure_row: 15 },
-        blinkboardADCRow: "a0",
-        measureRow: 15,
-        completed: false,
-        voltageData: [],
-      },
-      {
-        id: "sc_demo_1",
-        type: "switch_connection_suggestion",
-        title: "Switch connection suggestion",
-        description:
-          "The student mistakenly connected pin 10 to pin 11. You should switch the connection to pin 12.",
-        jsondata: { row_from: "10", row_to: "gnd" },
-        row_from: "10",
-        row_to: "gnd",
-        userObservation: "",
-        completed: false,
-      },
-      {
-        id: "hl_demo_1",
-
-        type: "add_high_low_voltage_test",
-        title: "High/Low Voltage Test",
-        description: "Test the high/low voltage of the circuit.",
-        jsondata: {
-          blinkboard_digital_row: "d0",
-          high_low_row: 1,
-          high_low_pattern: [
-            { voltage: "high", duration: 1000 },
-            { voltage: "low", duration: 1000 },
-            { voltage: "high", duration: 500 },
-            { voltage: "low", duration: 500 },
-            { voltage: "high", duration: 1000 },
-          ],
-        },
-        completed: false,
-      },
-    ],
-    timestamp: Date.now(),
-  },
+  // {
+  //   id: "1",
+  //   title: "Circuit Validation Tests",
+  //   description:
+  //     "Basic validation tests for circuit components and connections",
+  //   tests: [
+  //     // {
+  //     //   name: "Component Connection Test",
+  //     //   description: "Verify all components are properly connected",
+  //     // },
+  //     // {
+  //     //   name: "Power Supply Test",
+  //     //   description: "Check power supply connections and voltage levels",
+  //     // },
+  //     // {
+  //     //   name: "Signal Flow Test",
+  //     //   description: "Validate signal paths through the circuit",
+  //     // },
+  //     {
+  //       id: "so_demo_1",
+  //       type: "self_observe",
+  //       title: "When you press the button, what does the LED do?",
+  //       description:
+  //         "Press and release the button a few times and describe the LED behavior.",
+  //       jsondata: { row: [10] },
+  //       userObservation: "",
+  //       completed: false,
+  //     },
+  //     {
+  //       id: "mv_demo_1",
+  //       type: "measure_voltage",
+  //       title: "Measure voltage at row 15 using A0",
+  //       description:
+  //         "Rotate the potentiometer from end to end while measuring the voltage.",
+  //       jsondata: { blinkboard_adc_row: "a0", measure_row: 15 },
+  //       blinkboardADCRow: "a0",
+  //       measureRow: 15,
+  //       completed: false,
+  //       voltageData: [],
+  //     },
+  //     {
+  //       id: "sc_demo_1",
+  //       type: "switch_connection_suggestion",
+  //       title: "Switch connection suggestion",
+  //       description:
+  //         "The student mistakenly connected pin 10 to pin 11. You should switch the connection to pin 12.",
+  //       jsondata: { row_from: "10", row_to: "gnd" },
+  //       row_from: "10",
+  //       row_to: "gnd",
+  //       userObservation: "",
+  //       completed: false,
+  //     },
+  //     {
+  //       id: "hl_demo_1",
+  //       type: "add_high_low_voltage_test",
+  //       title: "High/Low Voltage Test",
+  //       description: "Test the high/low voltage of the circuit.",
+  //       jsondata: {
+  //         blinkboard_digital_row: "D0",
+  //         high_low_row: 1,
+  //         high_low_pattern: [
+  //           { voltage: "high", duration: 1000 },
+  //           { voltage: "low", duration: 1000 },
+  //           { voltage: "high", duration: 500 },
+  //           { voltage: "low", duration: 500 },
+  //           { voltage: "high", duration: 1000 },
+  //         ],
+  //       },
+  //       completed: false,
+  //     },
+  //   ],
+  //   timestamp: Date.now(),
+  // },
   // {
   //   id: "2",
   //   title: "Performance Tests",
