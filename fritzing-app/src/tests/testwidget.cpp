@@ -222,6 +222,15 @@ void TestWidget::onSubmitTestResults(const QString &groupId, const QList<QLineEd
             if (completionStatus.isEmpty()) completionStatus = "incomplete";
             testResult["answer"] = completionStatus;
             qDebug() << "🔌 Switch connection test completion status (from m_testGroups):" << completionStatus;
+        } else if (testType == "high_low_voltage") {
+            // Get the answer from input field for high/low voltage test
+            if (i < testInputs.size() && testInputs[i]) {
+                testResult["answer"] = testInputs[i]->text();
+                qDebug() << "⚡ High/Low voltage test observation:" << testInputs[i]->text();
+            } else {
+                testResult["answer"] = "";
+                qDebug() << "⚠️ No input field found for high/low voltage test";
+            }
         } else {
             // Get the answer from input field if available, otherwise empty string
             if (i < testInputs.size() && testInputs[i]) {
@@ -328,8 +337,11 @@ void TestWidget::createTestGroupCard(const QJsonObject &testGroup)
                 createSwitchConnectionSuggestionTestDisplay(test, card, cardLayout);
                 testData.append(test);
             } else if (testType == "high_low_voltage") {
-                createHighLowVoltageTestDisplay(test, card, cardLayout);
-                testData.append(test);
+                QLineEdit* input = createHighLowVoltageTestDisplay(test, card, cardLayout);
+                if (input) {
+                    testInputs.append(input);
+                    testData.append(test);
+                }
             } else {
                 // Minimal display for other test types
                 QString testName = test["name"].toString();
@@ -827,7 +839,7 @@ void TestWidget::handleMeasureRequest(const QJsonObject &test)
     emit measureRequested(test);
 }
 
-void TestWidget::createHighLowVoltageTestDisplay(const QJsonObject &test, QWidget *parent, QVBoxLayout *parentLayout)
+QLineEdit* TestWidget::createHighLowVoltageTestDisplay(const QJsonObject &test, QWidget *parent, QVBoxLayout *parentLayout)
 {
     // Create test container widget
     QFrame *testWidget = new QFrame(parent);
@@ -1026,6 +1038,7 @@ void TestWidget::createHighLowVoltageTestDisplay(const QJsonObject &test, QWidge
     parentLayout->addWidget(testWidget);
     
     qDebug() << "✅ High/Low voltage test displayed in TestWidget:" << test["title"].toString();
+    return observationInput; // Return the input field
 }
 
 void TestWidget::startPlayheadAnimation(const QString &testId, const QJsonArray &pattern)
