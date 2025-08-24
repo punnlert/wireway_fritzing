@@ -982,6 +982,50 @@ void BlinkBoardWidget::handleMeasureRequest(const QJsonObject &test)
   addChatMessage("Measure command sent to backend. Collecting voltage data...", false);
 }
 
+void BlinkBoardWidget::sendComponentHighlightToBackend(const QJsonObject& componentData)
+{
+  if (m_nodeProcess->state() != QProcess::Running) {
+    addChatMessage("Not connected to backend. Cannot send component highlight command.", false);
+    return;
+  }
+
+  // Create command to send component highlight to backend
+  QJsonObject jsonCommand;
+  jsonCommand["command"] = "component_highlight";
+  jsonCommand["component_id"] = componentData["component_id"];
+  jsonCommand["component_title"] = componentData["component_title"];
+  jsonCommand["pins"] = componentData["pins"];
+  jsonCommand["timestamp"] = QDateTime::currentMSecsSinceEpoch();
+  
+  QJsonDocument doc(jsonCommand);
+  QString jsonString = doc.toJson(QJsonDocument::Compact);
+  
+  qDebug() << "🔘 Sending component highlight to Node.js backend:" << jsonString.left(200) + "...";
+  m_nodeProcess->write(jsonString.toUtf8() + "\n");
+  
+  addChatMessage("Component highlight command sent to backend.", false);
+}
+
+void BlinkBoardWidget::sendAllHighlightedComponentsToBackend()
+{
+  if (m_nodeProcess->state() != QProcess::Running) {
+    addChatMessage("Not connected to backend. Cannot send component highlight commands.", false);
+    return;
+  }
+
+  if (m_highlightedComponents.isEmpty()) {
+    return; // Nothing to send
+  }
+
+  // Send highlight commands for all currently highlighted components
+  for (int i = 0; i < m_highlightedComponents.size(); ++i) {
+    QJsonObject component = m_highlightedComponents[i].toObject();
+    sendComponentHighlightToBackend(component);
+  }
+  
+  addChatMessage(QString("Sent %1 component highlight commands to backend.").arg(m_highlightedComponents.size()), false);
+}
+
 void BlinkBoardWidget::handleAnalogReadData(const QJsonObject &event)
 {
   // Parse the analog read data
@@ -1014,8 +1058,12 @@ void BlinkBoardWidget::handleComponentHighlighted(const QJsonObject& componentDa
   qDebug() << "=== COMPONENT HIGHLIGHT DATA RECEIVED ===";
   qDebug() << "Raw JSON data:" << componentData;
   
-  // Store the highlighted component locally instead of sending to backend immediately
+  // Store the highlighted component locally
   addHighlightedComponent(componentData);
+  
+  // Send all currently highlighted components to backend
+  // This ensures we send the complete selection state
+  sendAllHighlightedComponentsToBackend();
   
   // Add a chat message to inform the user
   QString title = componentData["component_title"].toString();
@@ -1035,7 +1083,14 @@ void BlinkBoardWidget::handleMultipleComponentsSelected(const QJsonArray& compon
     return;
   }
   
-  // Store the highlighted components locally instead of sending to backend immediately
+  // Send highlight commands for all selected components to backend at once
+  // This happens when the user finishes selecting (mouse release)
+  for (int i = 0; i < componentsData.size(); ++i) {
+    QJsonObject component = componentsData[i].toObject();
+    sendComponentHighlightToBackend(component);
+  }
+  
+  // Store the highlighted components locally
   m_highlightedComponents = componentsData;
   
   // Update the display to show highlighted components
@@ -1071,6 +1126,7 @@ void BlinkBoardWidget::removeHighlightedComponent(const QString& componentId) {
   for (int i = 0; i < m_highlightedComponents.size(); ++i) {
     QJsonObject component = m_highlightedComponents[i].toObject();
     if (component["component_id"].toString() == componentId) {
+      
       m_highlightedComponents.removeAt(i);
       updateHighlightedComponentsDisplay();
       

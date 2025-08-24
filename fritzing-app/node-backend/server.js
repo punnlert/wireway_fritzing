@@ -1237,7 +1237,7 @@ function convert_pinname_to_row_num(pinname) {
         if (rowNum <= 25) {
           return rowNum;
         }
-      } else if (rowLetter >= "F" && rowLetter <= "H") {
+      } else if (rowLetter >= "F" && rowLetter <= "J") {
         return rowNum + 25;
       }
     }
@@ -1598,19 +1598,7 @@ async function processCommand(command) {
           `🔘 Received component highlight request for: ${component_title}`
         );
 
-        // const component = JSON.stringify({
-        //   component_id,
-        //   component_title,
-        //   pins,
-        // });
-
-        // openai_chat_context = [
-        //   {
-        //     role: "developer",
-        //     content: `this component is highlighted on the user's UI: ${component}`,
-        //   },
-        // ];
-
+        console.log("pins", pins);
         blink_component(pins, "on");
 
         return {
@@ -1803,79 +1791,79 @@ process.on("unhandledRejection", (reason, promise) => {
 
 // Initialize with some sample test groups
 testGroups = [
-  // {
-  //   id: "1",
-  //   title: "Circuit Validation Tests",
-  //   description:
-  //     "Basic validation tests for circuit components and connections",
-  //   tests: [
-  //     // {
-  //     //   name: "Component Connection Test",
-  //     //   description: "Verify all components are properly connected",
-  //     // },
-  //     // {
-  //     //   name: "Power Supply Test",
-  //     //   description: "Check power supply connections and voltage levels",
-  //     // },
-  //     // {
-  //     //   name: "Signal Flow Test",
-  //     //   description: "Validate signal paths through the circuit",
-  //     // },
-  //     {
-  //       id: "so_demo_1",
-  //       type: "self_observe",
-  //       title: "When you press the button, what does the LED do?",
-  //       description:
-  //         "Press and release the button a few times and describe the LED behavior.",
-  //       jsondata: { row: [10] },
-  //       userObservation: "",
-  //       completed: false,
-  //     },
-  //     {
-  //       id: "mv_demo_1",
-  //       type: "measure_voltage",
-  //       title: "Measure voltage at row 15 using A0",
-  //       description:
-  //         "Rotate the potentiometer from end to end while measuring the voltage.",
-  //       jsondata: { blinkboard_adc_row: "a0", measure_row: 15 },
-  //       blinkboardADCRow: "a0",
-  //       measureRow: 15,
-  //       completed: false,
-  //       voltageData: [],
-  //     },
-  //     {
-  //       id: "sc_demo_1",
-  //       type: "switch_connection_suggestion",
-  //       title: "Switch connection suggestion",
-  //       description:
-  //         "The student mistakenly connected pin 10 to pin 11. You should switch the connection to pin 12.",
-  //       jsondata: { row_from: "10", row_to: "gnd" },
-  //       row_from: "10",
-  //       row_to: "gnd",
-  //       userObservation: "",
-  //       completed: false,
-  //     },
-  //     {
-  //       id: "hl_demo_1",
-  //       type: "add_high_low_voltage_test",
-  //       title: "High/Low Voltage Test",
-  //       description: "Test the high/low voltage of the circuit.",
-  //       jsondata: {
-  //         blinkboard_digital_row: "D0",
-  //         high_low_row: 1,
-  //         high_low_pattern: [
-  //           { voltage: "high", duration: 1000 },
-  //           { voltage: "low", duration: 1000 },
-  //           { voltage: "high", duration: 500 },
-  //           { voltage: "low", duration: 500 },
-  //           { voltage: "high", duration: 1000 },
-  //         ],
-  //       },
-  //       completed: false,
-  //     },
-  //   ],
-  //   timestamp: Date.now(),
-  // },
+  {
+    id: "1",
+    title: "Circuit Validation Tests",
+    description:
+      "Basic validation tests for circuit components and connections",
+    tests: [
+      // {
+      //   name: "Component Connection Test",
+      //   description: "Verify all components are properly connected",
+      // },
+      // {
+      //   name: "Power Supply Test",
+      //   description: "Check power supply connections and voltage levels",
+      // },
+      // {
+      //   name: "Signal Flow Test",
+      //   description: "Validate signal paths through the circuit",
+      // },
+      {
+        id: "so_demo_1",
+        type: "self_observe",
+        title: "When you press the button, what does the LED do?",
+        description:
+          "Press and release the button a few times and describe the LED behavior.",
+        jsondata: { row: [10] },
+        userObservation: "",
+        completed: false,
+      },
+      {
+        id: "mv_demo_1",
+        type: "measure_voltage",
+        title: "Measure voltage at row 15 using A0",
+        description:
+          "Rotate the potentiometer from end to end while measuring the voltage.",
+        jsondata: { blinkboard_adc_row: "a0", measure_row: 15 },
+        blinkboardADCRow: "a0",
+        measureRow: 15,
+        completed: false,
+        voltageData: [],
+      },
+      {
+        id: "sc_demo_1",
+        type: "switch_connection_suggestion",
+        title: "Switch connection suggestion",
+        description:
+          "The student mistakenly connected pin 10 to pin 11. You should switch the connection to pin 12.",
+        jsondata: { row_from: "10", row_to: "gnd" },
+        row_from: "10",
+        row_to: "gnd",
+        userObservation: "",
+        completed: false,
+      },
+      {
+        id: "hl_demo_1",
+        type: "high_low_voltage",
+        title: "High/Low Voltage Test",
+        description: "Test the high/low voltage of the circuit.",
+        jsondata: {
+          blinkboard_digital_row: "D0",
+          high_low_row: 1,
+          high_low_pattern: [
+            { voltage: "high", duration: 1000 },
+            { voltage: "low", duration: 1000 },
+            { voltage: "high", duration: 500 },
+            { voltage: "low", duration: 500 },
+            { voltage: "high", duration: 1000 },
+          ],
+        },
+        completed: false,
+      },
+    ],
+    timestamp: Date.now(),
+  },
   // {
   //   id: "2",
   //   title: "Performance Tests",
