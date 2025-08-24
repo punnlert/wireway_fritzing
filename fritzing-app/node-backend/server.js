@@ -276,6 +276,46 @@ const testing_tools = [
   },
   {
     type: "function",
+    name: "add_new_component_suggestion",
+    description:
+      "If there's a component that you think should be added in the circuit, you can add a suggestion here. e.g. add a resistor to the circuit",
+    parameters: {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        description: { type: "string" },
+        test_group_id: {
+          type: "string",
+          description:
+            "the id of the test group to add the test to. you must provide it every time for it to be added to the correct group. if you don't have any test group available, you can add a test group first by calling the add_test_group function",
+        },
+        jsondata: {
+          type: "object",
+          properties: {
+            component_name: { type: "string" },
+            component_value: { type: "string" },
+            connections: {
+              type: "array",
+              description:
+                "the connections of the component. e.g. [1, 2, 3] means the component is connected to the 1st, 2nd, and 3rd rows. some connections maybe crossing the middle of the board. e.g. [1, 26], or [n, n+25] n < 25.",
+              items: {
+                type: "number",
+                maximum: 50,
+                minimum: 1,
+              },
+            },
+          },
+          required: ["component_name", "component_value", "connections"],
+          additionalProperties: false,
+        },
+      },
+      required: ["title", "description", "jsondata", "test_group_id"],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    type: "function",
     name: "add_switch_connection_suggestion",
     description:
       "Sometimes, the student might mistakenly connect some pins in the wrong hole. This is how we suggest them to fix it.",
@@ -503,7 +543,7 @@ const suggesting_tools = [
             connections: {
               type: "array",
               description:
-                "the connections of the component. e.g. [1, 2, 3] means the component is connected to the 1st, 2nd, and 3rd rows",
+                "the connections of the component. e.g. [1, 2, 3] means the component is connected to the 1st, 2nd, and 3rd rows. some connections maybe crossing the middle of the board. e.g. [1, 26], or [n, n+25] n < 25.",
               items: {
                 type: "number",
                 maximum: 50,
@@ -511,6 +551,8 @@ const suggesting_tools = [
               },
             },
           },
+          required: ["component_name", "component_value", "connections"],
+          additionalProperties: false,
         },
       },
       required: ["title", "description", "jsondata", "test_group_id"],
@@ -1110,6 +1152,14 @@ class EventHandler extends EventEmitter {
               test_group_id,
             });
 
+            process.stdout.write(
+              JSON.stringify({
+                type: "adding_test",
+                message: "Adding test...",
+                timestamp: Date.now(),
+              }) + "\n"
+            );
+
             openai_chat_history.push({
               type: "function_call_output",
               call_id: response.call_id,
@@ -1125,6 +1175,14 @@ class EventHandler extends EventEmitter {
               jsondata,
               test_group_id,
             });
+
+            process.stdout.write(
+              JSON.stringify({
+                type: "adding_test",
+                message: "Adding test...",
+                timestamp: Date.now(),
+              }) + "\n"
+            );
 
             openai_chat_history.push({
               type: "function_call_output",
@@ -1142,6 +1200,14 @@ class EventHandler extends EventEmitter {
               test_group_id,
             });
 
+            process.stdout.write(
+              JSON.stringify({
+                type: "adding_test",
+                message: "Adding test...",
+                timestamp: Date.now(),
+              }) + "\n"
+            );
+
             openai_chat_history.push({
               type: "function_call_output",
               call_id: response.call_id,
@@ -1157,6 +1223,14 @@ class EventHandler extends EventEmitter {
               jsondata,
               test_group_id,
             });
+
+            process.stdout.write(
+              JSON.stringify({
+                type: "adding_test",
+                message: "Adding test...",
+                timestamp: Date.now(),
+              }) + "\n"
+            );
 
             openai_chat_history.push({
               type: "function_call_output",
@@ -1174,6 +1248,14 @@ class EventHandler extends EventEmitter {
               test_group_id,
             });
 
+            process.stdout.write(
+              JSON.stringify({
+                type: "adding_suggestion",
+                message: "Adding suggestion...",
+                timestamp: Date.now(),
+              }) + "\n"
+            );
+
             openai_chat_history.push({
               type: "function_call_output",
               call_id: response.call_id,
@@ -1190,6 +1272,14 @@ class EventHandler extends EventEmitter {
               test_group_id,
             });
 
+            process.stdout.write(
+              JSON.stringify({
+                type: "adding_suggestion",
+                message: "Adding suggestion...",
+                timestamp: Date.now(),
+              }) + "\n"
+            );
+
             openai_chat_history.push({
               type: "function_call_output",
               call_id: response.call_id,
@@ -1202,6 +1292,14 @@ class EventHandler extends EventEmitter {
             const { title, description } = JSON.parse(response.arguments);
             const result = add_test_group({ title, description });
 
+            process.stdout.write(
+              JSON.stringify({
+                type: "adding_test_group",
+                message: "Adding test group...",
+                timestamp: Date.now(),
+              }) + "\n"
+            );
+
             openai_chat_history.push({
               type: "function_call_output",
               call_id: response.call_id,
@@ -1209,6 +1307,14 @@ class EventHandler extends EventEmitter {
             });
           } else if (response.name === "request_schematics") {
             const result = request_schematics();
+
+            process.stdout.write(
+              JSON.stringify({
+                type: "requesting_schematics",
+                message: "Requesting schematics...",
+                timestamp: Date.now(),
+              }) + "\n"
+            );
 
             openai_chat_history.push({
               type: "function_call_output",
@@ -2064,99 +2170,99 @@ process.on("unhandledRejection", (reason, promise) => {
 
 // Initialize with some sample test groups
 testGroups = [
-  {
-    id: "1",
-    title: "Circuit Validation Tests",
-    description:
-      "Basic validation tests for circuit components and connections",
-    tests: [
-      // {
-      //   name: "Component Connection Test",
-      //   description: "Verify all components are properly connected",
-      // },
-      // {
-      //   name: "Power Supply Test",
-      //   description: "Check power supply connections and voltage levels",
-      // },
-      // {
-      //   name: "Signal Flow Test",
-      //   description: "Validate signal paths through the circuit",
-      // },
-      {
-        id: "so_demo_1",
-        type: "self_observe",
-        title: "When you press the button, what does the LED do?",
-        description:
-          "Press and release the button a few times and describe the LED behavior.",
-        jsondata: { row: [10] },
-        userObservation: "",
-        completed: false,
-      },
-      {
-        id: "mv_demo_1",
-        type: "measure_voltage",
-        title: "Measure voltage at row 15 using A0",
-        description:
-          "Rotate the potentiometer from end to end while measuring the voltage.",
-        jsondata: { blinkboard_adc_row: "a0", measure_row: 15 },
-        blinkboardADCRow: "a0",
-        measureRow: 15,
-        completed: false,
-        voltageData: [],
-      },
-      {
-        id: "sc_demo_1",
-        type: "switch_connection_suggestion",
-        title: "Switch connection suggestion",
-        description:
-          "The student mistakenly connected pin 10 to pin 11. You should switch the connection to pin 12.",
-        jsondata: { row_from: "10", row_to: "gnd" },
-        row_from: "10",
-        row_to: "gnd",
-        userObservation: "",
-        completed: false,
-      },
-      {
-        id: "hl_demo_1",
-        type: "high_low_voltage",
-        title: "High/Low Voltage Test",
-        description: "Test the high/low voltage of the circuit.",
-        jsondata: {
-          blinkboard_digital_row: "D0",
-          high_low_row: 1,
-          high_low_pattern: [
-            { voltage: "high", duration: 1000 },
-            { voltage: "low", duration: 1000 },
-            { voltage: "high", duration: 500 },
-            { voltage: "low", duration: 500 },
-            { voltage: "high", duration: 1000 },
-          ],
-        },
-        completed: false,
-      },
-      {
-        id: "av_demo_1",
-        type: "analog_voltage",
-        title: "Output 1.5V to row 1",
-        description: "Output 1.5V to row 1",
-        jsondata: { output_row: 1, output_voltage: 1.5 },
-        completed: false,
-      },
-      {
-        id: "nc_demo_1",
-        type: "new_component_suggestion",
-        title: "Add a resistor to the circuit",
-        description: "Add a resistor to the circuit",
-        jsondata: {
-          component_name: "resistor",
-          component_value: "1k",
-          connections: [1, 26],
-        },
-        completed: false,
-      },
-    ],
-    timestamp: Date.now(),
-  },
+  // {
+  //   id: "1",
+  //   title: "Circuit Validation Tests",
+  //   description:
+  //     "Basic validation tests for circuit components and connections",
+  //   tests: [
+  //     // {
+  //     //   name: "Component Connection Test",
+  //     //   description: "Verify all components are properly connected",
+  //     // },
+  //     // {
+  //     //   name: "Power Supply Test",
+  //     //   description: "Check power supply connections and voltage levels",
+  //     // },
+  //     // {
+  //     //   name: "Signal Flow Test",
+  //     //   description: "Validate signal paths through the circuit",
+  //     // },
+  //     {
+  //       id: "so_demo_1",
+  //       type: "self_observe",
+  //       title: "When you press the button, what does the LED do?",
+  //       description:
+  //         "Press and release the button a few times and describe the LED behavior.",
+  //       jsondata: { row: [10] },
+  //       userObservation: "",
+  //       completed: false,
+  //     },
+  //     {
+  //       id: "mv_demo_1",
+  //       type: "measure_voltage",
+  //       title: "Measure voltage at row 15 using A0",
+  //       description:
+  //         "Rotate the potentiometer from end to end while measuring the voltage.",
+  //       jsondata: { blinkboard_adc_row: "a0", measure_row: 15 },
+  //       blinkboardADCRow: "a0",
+  //       measureRow: 15,
+  //       completed: false,
+  //       voltageData: [],
+  //     },
+  //     {
+  //       id: "sc_demo_1",
+  //       type: "switch_connection_suggestion",
+  //       title: "Switch connection suggestion",
+  //       description:
+  //         "The student mistakenly connected pin 10 to pin 11. You should switch the connection to pin 12.",
+  //       jsondata: { row_from: "10", row_to: "gnd" },
+  //       row_from: "10",
+  //       row_to: "gnd",
+  //       userObservation: "",
+  //       completed: false,
+  //     },
+  //     {
+  //       id: "hl_demo_1",
+  //       type: "high_low_voltage",
+  //       title: "High/Low Voltage Test",
+  //       description: "Test the high/low voltage of the circuit.",
+  //       jsondata: {
+  //         blinkboard_digital_row: "D0",
+  //         high_low_row: 1,
+  //         high_low_pattern: [
+  //           { voltage: "high", duration: 1000 },
+  //           { voltage: "low", duration: 1000 },
+  //           { voltage: "high", duration: 500 },
+  //           { voltage: "low", duration: 500 },
+  //           { voltage: "high", duration: 1000 },
+  //         ],
+  //       },
+  //       completed: false,
+  //     },
+  //     {
+  //       id: "av_demo_1",
+  //       type: "analog_voltage",
+  //       title: "Output 1.5V to row 1",
+  //       description: "Output 1.5V to row 1",
+  //       jsondata: { output_row: 1, output_voltage: 1.5 },
+  //       completed: false,
+  //     },
+  //     {
+  //       id: "nc_demo_1",
+  //       type: "new_component_suggestion",
+  //       title: "Add a resistor to the circuit",
+  //       description: "Add a resistor to the circuit",
+  //       jsondata: {
+  //         component_name: "resistor",
+  //         component_value: "1k",
+  //         connections: [1, 26],
+  //       },
+  //       completed: false,
+  //     },
+  //   ],
+  //   timestamp: Date.now(),
+  // },
   // {
   //   id: "2",
   //   title: "Performance Tests",
