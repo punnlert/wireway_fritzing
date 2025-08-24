@@ -45,6 +45,7 @@ public slots:
   void handleMultipleComponentsSelected(const QJsonArray& componentsData);
   void handleComponentDeselected(const QString& componentId);
   void sendComponentHighlightToBackend(const QJsonObject& componentData);
+  void addComponentToContextOnly(const QJsonObject& componentData);
 
 signals:
   void testsReceived(const QJsonArray &tests);

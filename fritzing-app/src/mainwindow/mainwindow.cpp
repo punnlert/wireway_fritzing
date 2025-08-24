@@ -3226,3 +3226,8 @@ void MainWindow::handleBreadboardComponentDeselected(const QString& componentId)
 	// Emit the signal to the BlinkBoardWidget
 	emit breadboardComponentDeselected(componentId);
 }
+
+void MainWindow::handleBreadboardComponentAddedToContext(const QJsonObject& componentData) {
+	// Emit the signal to the BlinkBoardWidget for context-only addition
+	emit breadboardComponentAddedToContext(componentData);
+}

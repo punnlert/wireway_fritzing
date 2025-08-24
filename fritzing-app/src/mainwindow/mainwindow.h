@@ -264,6 +264,7 @@ signals:
   void breadboardComponentHighlighted(const QJsonObject& componentData);
   void multipleBreadboardComponentsSelected(const QJsonArray& componentsData);
   void breadboardComponentDeselected(const QString& componentId);
+  void breadboardComponentAddedToContext(const QJsonObject& componentData);
 
 public slots:
   void ensureClosable();
@@ -295,6 +296,7 @@ public slots:
   void handleBreadboardComponentHighlighted(const QJsonObject& componentData);
   void handleMultipleBreadboardComponentsSelected(const QJsonArray& componentsData);
   void handleBreadboardComponentDeselected(const QString& componentId);
+  void handleBreadboardComponentAddedToContext(const QJsonObject& componentData);
 
 protected slots:
   void mainLoad();

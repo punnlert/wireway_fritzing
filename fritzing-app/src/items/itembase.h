@@ -326,6 +326,7 @@ public:
 protected:
 	void mouseMoveEvent(QGraphicsSceneMouseEvent *event);
 	void mouseReleaseEvent(QGraphicsSceneMouseEvent *event );
+	virtual void mouseDoubleClickEvent(QGraphicsSceneMouseEvent *event);
 	virtual void paintHover(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget);
 	virtual void paintHover(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget, const QPainterPath & shape);
 	virtual void paintSelected(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget);

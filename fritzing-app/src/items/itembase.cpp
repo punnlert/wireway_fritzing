@@ -1150,6 +1150,66 @@ void ItemBase::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
 	// setCacheMode(QGraphicsItem::DeviceCoordinateCache);
 }
 
+void ItemBase::mouseDoubleClickEvent(QGraphicsSceneMouseEvent *event)
+{
+	// Check if this is a breadboard component being double-clicked
+	if (m_viewID == ViewLayer::BreadboardView) {
+		// For double-click, add component to context without turning on physical board
+		QJsonObject componentData;
+		componentData["component_id"] = QString::number(m_id);
+		componentData["component_title"] = title();
+		
+		// Get actual breadboard pin connections
+		QJsonArray pinsArray;
+		const QList<ConnectorItem *> &connectors = cachedConnectorItems();
+		
+		if (connectors.count() > 0) {
+			foreach (ConnectorItem *connector, connectors) {
+				if (connector) {
+					// Get the actual connections to find breadboard pins
+					if (connector->connectionsCount() > 0) {
+						foreach (ConnectorItem *connectedConnector, connector->connectedToItems()) {
+							if (connectedConnector) {
+								ItemBase *connectedItem = connectedConnector->attachedTo();
+								if (connectedItem) {
+									// Check if this is connected to a breadboard
+									if (connectedItem->viewID() == ViewLayer::BreadboardView) {
+										// Get the breadboard pin information
+										QString pinInfo = QString("%1").arg(connectedConnector->connectorSharedID());
+										pinsArray.append(pinInfo);
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		
+		componentData["pins"] = pinsArray;
+		
+		// Emit signal through InfoGraphicsView to MainWindow for context only
+		InfoGraphicsView *infoGraphicsView = InfoGraphicsView::getInfoGraphicsView(this);
+		if (infoGraphicsView) {
+			QWidget *parent = qobject_cast<QWidget*>(infoGraphicsView->parent());
+			while (parent && !qobject_cast<MainWindow*>(parent)) {
+				parent = qobject_cast<QWidget*>(parent->parent());
+			}
+			
+			if (MainWindow *mainWindow = qobject_cast<MainWindow*>(parent)) {
+				// Use QMetaObject::invokeMethod to safely emit the signal from a different thread
+				// This will add the component to context without sending backend commands
+				QMetaObject::invokeMethod(mainWindow, "handleBreadboardComponentAddedToContext",
+										Qt::QueuedConnection,
+										Q_ARG(QJsonObject, componentData));
+			}
+		}
+	}
+	
+	// Call parent class for proper event handling
+	QGraphicsSvgItem::mouseDoubleClickEvent(event);
+}
+
 void ItemBase::mouseMoveEvent(QGraphicsSceneMouseEvent *)
 {
 }

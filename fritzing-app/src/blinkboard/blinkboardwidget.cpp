@@ -1006,6 +1006,24 @@ void BlinkBoardWidget::sendComponentHighlightToBackend(const QJsonObject& compon
   addChatMessage("Component highlight command sent to backend.", false);
 }
 
+void BlinkBoardWidget::addComponentToContextOnly(const QJsonObject& componentData)
+{
+  qDebug() << "=== COMPONENT ADDED TO CONTEXT ONLY ===";
+  qDebug() << "Raw JSON data:" << componentData;
+  
+  // Store the highlighted component locally for context (no backend command)
+  addHighlightedComponent(componentData);
+  
+  // Do NOT send component highlight command to backend
+  // This is for double-click events that should only add to context
+  
+  // Add a chat message to inform the user
+  QString title = componentData["component_title"].toString();
+  if (title.isEmpty()) title = componentData["component_id"].toString();
+  
+  addChatMessage(QString("Added '%1' to context (double-click)").arg(title), false);
+}
+
 void BlinkBoardWidget::handleAnalogReadData(const QJsonObject &event)
 {
   // Parse the analog read data
