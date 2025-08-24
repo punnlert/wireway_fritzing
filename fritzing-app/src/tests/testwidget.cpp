@@ -237,12 +237,31 @@ void TestWidget::onSubmitTestResults(const QString &groupId, const QList<QLineEd
 
 void TestWidget::clearCards()
 {
+    // Stop all playhead animations
+    for (const QString &testId : m_playheadTimers.keys()) {
+        stopPlayheadAnimation(testId);
+    }
+    
     // Remove all cards from the layout
     QLayoutItem *item;
     while ((item = m_cardLayout->takeAt(0)) != nullptr) {
         delete item->widget();
         delete item;
     }
+    
+    // Clear chart references
+    m_testCharts.clear();
+    m_testSeries.clear();
+    
+    // Clear playhead data
+    m_playheadTimers.clear();
+    m_playheadPositions.clear();
+    m_playheadPatterns.clear();
+    m_playheadTotalDurations.clear();
+    
+    // Reset measuring state
+    m_currentMeasuringTestId.clear();
+    m_firstTimestamp = 0;
 }
 
 void TestWidget::createTestGroupCard(const QJsonObject &testGroup)
@@ -301,6 +320,9 @@ void TestWidget::createTestGroupCard(const QJsonObject &testGroup)
                 testData.append(test);
             } else if (testType == "switch_connection_suggestion") {
                 createSwitchConnectionSuggestionTestDisplay(test, card, cardLayout);
+                testData.append(test);
+            } else if (testType == "add_high_low_voltage_test") {
+                createHighLowVoltageTestDisplay(test, card, cardLayout);
                 testData.append(test);
             } else {
                 // Minimal display for other test types
@@ -454,6 +476,7 @@ void TestWidget::createMeasureVoltageTestDisplay(const QJsonObject &test, QWidge
     // Create individual chart for this test
     QChart *testChart = new QChart();
     testChart->legend()->hide(); // Hide the legend completely
+    testChart->setTitle("Voltage Reading");
     
     QLineSeries *testSeries = new QLineSeries();
     testSeries->setName(""); // Empty name to avoid legend entry
@@ -461,7 +484,7 @@ void TestWidget::createMeasureVoltageTestDisplay(const QJsonObject &test, QWidge
     
     // Create axes
     QValueAxis *axisY = new QValueAxis();
-    axisY->setTitleText("V");
+    axisY->setTitleText("Voltage (V)");
     axisY->setRange(0, 5);
     axisY->setLabelFormat("%.2f");
     
@@ -796,6 +819,289 @@ void TestWidget::handleMeasureRequest(const QJsonObject &test)
     qDebug() << "📊 Reset timestamp for new measurement session";
     
     emit measureRequested(test);
+}
+
+void TestWidget::createHighLowVoltageTestDisplay(const QJsonObject &test, QWidget *parent, QVBoxLayout *parentLayout)
+{
+    // Create test container widget
+    QFrame *testWidget = new QFrame(parent);
+    testWidget->setStyleSheet("QFrame { background-color: #d6d6d6; padding: 5px; margin: 5px; }");
+    
+    QVBoxLayout *testLayout = new QVBoxLayout(testWidget);
+    testLayout->setContentsMargins(10, 10, 10, 10);
+    testLayout->setSpacing(12);
+    
+    // Test title
+    QLabel *titleLabel = new QLabel(test["title"].toString());
+    titleLabel->setStyleSheet("QLabel { font-family: 'Droid Sans'; font-size: 12px; font-weight: bold; color: #333; }");
+    testLayout->addWidget(titleLabel);
+    
+    // Test description
+    QLabel *descLabel = new QLabel(test["description"].toString());
+    descLabel->setStyleSheet("QLabel { font-family: 'Droid Sans'; font-size: 10px; color: #666; }");
+    descLabel->setWordWrap(true);
+    testLayout->addWidget(descLabel);
+    
+    // Graph area (middle section) - Square wave chart
+    QFrame *graphFrame = new QFrame(testWidget);
+    graphFrame->setStyleSheet("QFrame { background-color: white; min-height: 300px; border: 1px solid #ccc; }");
+    graphFrame->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    
+    QVBoxLayout *graphLayout = new QVBoxLayout(graphFrame);
+    graphLayout->setContentsMargins(10, 10, 10, 10);
+    graphLayout->setSpacing(0);
+    
+    // Create chart for this test
+    QChart *testChart = new QChart();
+    testChart->legend()->hide();
+    testChart->setTitle("High/Low Voltage Pattern");
+    
+    // Create series for the square wave
+    QLineSeries *squareWaveSeries = new QLineSeries();
+    squareWaveSeries->setName("Voltage Pattern");
+    
+    // Create series for the playhead (vertical line)
+    QLineSeries *playheadSeries = new QLineSeries();
+    playheadSeries->setName("Playhead");
+    playheadSeries->setPen(QPen(Qt::red, 2, Qt::SolidLine));
+    
+    // Extract the high/low pattern from test data
+    QJsonArray highLowPattern = test["jsondata"]["high_low_pattern"].toArray();
+    
+    // Calculate total duration and create square wave
+    int totalDuration = 0;
+    QList<QPointF> squareWavePoints;
+    
+    // Start at origin
+    squareWavePoints.append(QPointF(0, 0));
+    
+    // Generate square wave based on the pattern
+    for (const QJsonValue &patternValue : highLowPattern) {
+        QJsonObject pattern = patternValue.toObject();
+        QString voltage = pattern["voltage"].toString();
+        int duration = pattern["duration"].toInt();
+        
+        double voltageLevel = (voltage == "high") ? 5.0 : 0.0;
+        
+        // Add points to create square wave
+        squareWavePoints.append(QPointF(totalDuration, voltageLevel));
+        totalDuration += duration;
+        squareWavePoints.append(QPointF(totalDuration, voltageLevel));
+    }
+    
+    // Add final point to complete the pattern
+    if (totalDuration > 0) {
+        squareWavePoints.append(QPointF(totalDuration, 0));
+    }
+    
+    // Add points to the series
+    for (const QPointF &point : squareWavePoints) {
+        squareWaveSeries->append(point);
+    }
+    
+    // Add series to chart
+    testChart->addSeries(squareWaveSeries);
+    testChart->addSeries(playheadSeries);
+    
+    // Create axes
+    QValueAxis *axisY = new QValueAxis();
+    axisY->setTitleText("Voltage (V)");
+    axisY->setRange(0, 5);
+    axisY->setLabelFormat("%.1f");
+    axisY->setTickCount(6);
+    
+    QValueAxis *axisX = new QValueAxis();
+    axisX->setTitleText("Time (ms)");
+    axisX->setRange(0, totalDuration > 0 ? totalDuration : 1000);
+    axisX->setLabelFormat("%.0f");
+    
+    testChart->addAxis(axisY, Qt::AlignLeft);
+    testChart->addAxis(axisX, Qt::AlignBottom);
+    
+    squareWaveSeries->attachAxis(axisX);
+    squareWaveSeries->attachAxis(axisY);
+    playheadSeries->attachAxis(axisX);
+    playheadSeries->attachAxis(axisY);
+    
+    // Create chart view
+    QChartView *testChartView = new QChartView(testChart);
+    testChartView->setRenderHint(QPainter::Antialiasing);
+    testChartView->setMinimumHeight(250);
+    testChartView->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    
+    // Store chart references for playhead animation
+    QString testId = test["id"].toString();
+    if (!testId.isEmpty()) {
+        m_testCharts[testId] = testChart;
+        // Store the playhead series for animation
+        m_testSeries[testId] = playheadSeries;
+    }
+    
+    graphLayout->addWidget(testChartView);
+    testLayout->addWidget(graphFrame);
+    
+    // Add some spacing after the graph
+    testLayout->addSpacing(10);
+    
+    // Button area (bottom section)
+    QHBoxLayout *buttonLayout = new QHBoxLayout();
+    buttonLayout->setSpacing(10);
+    
+    // Blink button
+    QPushButton *blinkButton = new QPushButton("Blink", testWidget);
+    blinkButton->setStyleSheet("QPushButton { padding: 6px 12px; background: #f23926; color: white; border: none; border-radius: 3px; font-family: 'Droid Sans'; font-size: 10px; } QPushButton:hover { background: #d32f2f; } QPushButton:pressed { background: #b71c1c; }");
+    blinkButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    
+    // Connect blink button - sends blink_request to backend
+    connect(blinkButton, &QPushButton::clicked, [this, test]() {
+        qDebug() << "🔘 Blink button clicked for high/low voltage test:" << test["title"].toString();
+        emit blinkRequested(test, "blink");
+    });
+    
+    // Play Sequence button
+    QPushButton *playSequenceButton = new QPushButton("Play Sequence", testWidget);
+    playSequenceButton->setStyleSheet("QPushButton { padding: 6px 12px; background: #4CAF50; color: white; border: none; border-radius: 3px; font-family: 'Droid Sans'; font-size: 10px; } QPushButton:hover { background: #45a049; } QPushButton:pressed { background: #3d8b40; }");
+    playSequenceButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    
+    // Connect play sequence button - starts playhead animation
+    connect(playSequenceButton, &QPushButton::clicked, [this, test]() {
+        qDebug() << "▶️ Play Sequence button clicked for high/low voltage test:" << test["title"].toString();
+        
+        QString testId = test["id"].toString();
+        if (!testId.isEmpty()) {
+            QJsonArray pattern = test["jsondata"]["high_low_pattern"].toArray();
+            if (!pattern.isEmpty()) {
+                startPlayheadAnimation(testId, pattern);
+            } else {
+                qDebug() << "⚠️ No pattern data found for test:" << testId;
+            }
+        } else {
+            qDebug() << "⚠️ Test ID is empty, cannot start animation";
+        }
+    });
+    
+    buttonLayout->addWidget(blinkButton);
+    buttonLayout->addWidget(playSequenceButton);
+    buttonLayout->addStretch(); // Push buttons to the left
+    
+    testLayout->addLayout(buttonLayout);
+    
+    // Add some spacing before the observation input
+    testLayout->addSpacing(15);
+    
+    // Observation input area (similar to self_observe_test)
+    QLabel *observationLabel = new QLabel("Describe your observation:");
+    observationLabel->setStyleSheet("QLabel { font-family: 'Droid Sans'; font-size: 10px; font-weight: bold; color: #333; }");
+    testLayout->addWidget(observationLabel);
+    
+    QLineEdit *observationInput = new QLineEdit(testWidget);
+    observationInput->setPlaceholderText("Enter your observation here...");
+    observationInput->setStyleSheet("QLineEdit { padding: 8px; border: 1px solid #b1b1b1; border-radius: 3px; background: #ececec; color: #323232; font-family: 'Droid Sans'; font-size: 10px; } QLineEdit:focus { border: 1px solid #f23926; }");
+    observationInput->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    testLayout->addWidget(observationInput);
+    
+    // Add test widget to parent layout
+    parentLayout->addWidget(testWidget);
+    
+    qDebug() << "✅ High/Low voltage test displayed in TestWidget:" << test["title"].toString();
+}
+
+void TestWidget::startPlayheadAnimation(const QString &testId, const QJsonArray &pattern)
+{
+    // Stop any existing animation for this test
+    stopPlayheadAnimation(testId);
+    
+    // Calculate total duration
+    int totalDuration = 0;
+    for (const QJsonValue &patternValue : pattern) {
+        QJsonObject p = patternValue.toObject();
+        totalDuration += p["duration"].toInt();
+    }
+    
+    // Store pattern and duration
+    m_playheadPatterns[testId] = pattern;
+    m_playheadTotalDurations[testId] = totalDuration;
+    m_playheadPositions[testId] = 0;
+    
+    // Create and start timer
+    QTimer *timer = new QTimer(this);
+    timer->setInterval(50); // Update every 50ms for smooth animation
+    
+    connect(timer, &QTimer::timeout, [this, testId]() {
+        updatePlayheadPosition(testId);
+    });
+    
+    m_playheadTimers[testId] = timer;
+    timer->start();
+    
+    qDebug() << "▶️ Started playhead animation for test:" << testId << "Total duration:" << totalDuration << "ms";
+}
+
+void TestWidget::updatePlayheadPosition(const QString &testId)
+{
+    if (!m_playheadTimers.contains(testId) || !m_testSeries.contains(testId)) {
+        return;
+    }
+    
+    QLineSeries *playheadSeries = m_testSeries[testId];
+    int currentPos = m_playheadPositions[testId];
+    int totalDuration = m_playheadTotalDurations[testId];
+    
+    // Clear previous playhead
+    playheadSeries->clear();
+    
+    // Update position
+    currentPos += 50; // Move by timer interval
+    m_playheadPositions[testId] = currentPos;
+    
+    // Check if animation is complete
+    if (currentPos >= totalDuration) {
+        stopPlayheadAnimation(testId);
+        return;
+    }
+    
+    // Draw playhead as vertical line
+    QList<QPointF> playheadPoints;
+    playheadPoints.append(QPointF(currentPos, 0));
+    playheadPoints.append(QPointF(currentPos, 5));
+    
+    for (const QPointF &point : playheadPoints) {
+        playheadSeries->append(point);
+    }
+    
+    // Update the chart
+    QChart *chart = m_testCharts[testId];
+    if (chart) {
+        chart->update();
+    }
+}
+
+void TestWidget::stopPlayheadAnimation(const QString &testId)
+{
+    if (m_playheadTimers.contains(testId)) {
+        QTimer *timer = m_playheadTimers[testId];
+        timer->stop();
+        timer->deleteLater();
+        m_playheadTimers.remove(testId);
+    }
+    
+    // Clear playhead
+    if (m_testSeries.contains(testId)) {
+        QLineSeries *playheadSeries = m_testSeries[testId];
+        playheadSeries->clear();
+        
+        // Update the chart
+        QChart *chart = m_testCharts[testId];
+        if (chart) {
+            chart->update();
+        }
+    }
+    
+    m_playheadPositions.remove(testId);
+    m_playheadPatterns.remove(testId);
+    m_playheadTotalDurations.remove(testId);
+    
+    qDebug() << "⏹️ Stopped playhead animation for test:" << testId;
 }
 
 

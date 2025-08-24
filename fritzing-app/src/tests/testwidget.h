@@ -12,6 +12,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QLineEdit>
+#include <QTimer>
 #include <QtCharts/QChartView>
 #include <QtCharts/QLineSeries>
 #include <QtCharts/QChart>
@@ -59,7 +60,13 @@ private:
     QLineEdit* createSelfObserveTestDisplay(const QJsonObject &test, QWidget *parent, QVBoxLayout *parentLayout);
     void createMeasureVoltageTestDisplay(const QJsonObject &test, QWidget *parent, QVBoxLayout *parentLayout);
     void createSwitchConnectionSuggestionTestDisplay(const QJsonObject &test, QWidget *parent, QVBoxLayout *parentLayout);
+    void createHighLowVoltageTestDisplay(const QJsonObject &test, QWidget *parent, QVBoxLayout *parentLayout);
     void clearCards();
+    
+    // Playhead animation methods
+    void startPlayheadAnimation(const QString &testId, const QJsonArray &pattern);
+    void updatePlayheadPosition(const QString &testId);
+    void stopPlayheadAnimation(const QString &testId);
     
     // Backend handling
     void handleTestsReceived(const QJsonArray &tests);
@@ -85,6 +92,12 @@ private:
     
     // Track first timestamp for each measurement session
     qint64 m_firstTimestamp;
+    
+    // Playhead animation for high/low voltage tests
+    QMap<QString, QTimer*> m_playheadTimers;
+    QMap<QString, int> m_playheadPositions;
+    QMap<QString, QJsonArray> m_playheadPatterns;
+    QMap<QString, int> m_playheadTotalDurations;
     
     // Backend connection
     QPushButton *m_connectButton;

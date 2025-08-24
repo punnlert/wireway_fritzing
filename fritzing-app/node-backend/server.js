@@ -154,6 +154,73 @@ const testing_tools = [
   },
   {
     type: "function",
+    name: "add_high_low_voltage_test",
+    description:
+      "Choose a specific row that you want to turn high or low and let the student observe the result of the change.",
+    parameters: {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        description: {
+          type: "string",
+          description:
+            "this should explain the reason why you administered this test",
+        },
+        test_group_id: {
+          type: "string",
+          description:
+            "the id of the test group to add the test to. you must provide it every time for it to be added to the correct group. if you don't have any test group available, you can add a test group first by calling the add_test_group function",
+        },
+        jsondata: {
+          type: "object",
+          properties: {
+            blinkboard_digital_row: {
+              type: "string",
+              description:
+                "you can decide by yourself which digital row to use for to administer the voltage. this is the blinkboard built-in digital rows",
+              enum: ["d0", "d1"],
+            },
+            high_low_pattern: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  voltage: {
+                    type: "string",
+                    description: "the voltage you want to turn the row to",
+                    enum: ["high", "low"],
+                  },
+                  duration: {
+                    type: "number",
+                    description: "the duration of the voltage in milliseconds",
+                  },
+                },
+                required: ["voltage", "duration"],
+                additionalProperties: false,
+              },
+            },
+            high_low_row: {
+              type: "number",
+              description: "the row which you want to turn high or low",
+              maximum: 50,
+              minimum: 1,
+            },
+          },
+          required: [
+            "blinkboard_digital_row",
+            "high_low_row",
+            "high_low_pattern",
+          ],
+          additionalProperties: false,
+        },
+      },
+      required: ["title", "description", "jsondata", "test_group_id"],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    type: "function",
     name: "add_switch_connection_suggestion",
     description:
       "Sometimes, the student might mistakenly connect some pins in the wrong hole. This is how we suggest them to fix it.",
@@ -615,6 +682,55 @@ function add_measure_voltage_test({
   }
 }
 
+function add_high_low_voltage_test({
+  title,
+  description,
+  jsondata,
+  test_group_id,
+}) {
+  if (testGroups.length > 0) {
+    const groupIndex = testGroups.findIndex(
+      (group) => group.id === test_group_id
+    );
+
+    if (groupIndex === -1) {
+      console.log("❌ Test group not found");
+      return {
+        successfully_added: false,
+        error: "Test group not found",
+      };
+    }
+
+    const newTest = {
+      id: `test_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      type: "high_low_voltage",
+      title: title,
+      description: description,
+      jsondata: jsondata || {},
+      blinkboardDigitalRow: jsondata?.blinkboard_digital_row || "d0",
+      highLowRow: jsondata?.high_low_row || 1,
+      highLowPattern: jsondata?.high_low_pattern || [],
+      completed: false,
+    };
+
+    testGroups[groupIndex].tests.push(newTest);
+
+    console.log(
+      `✅ Added high low voltage test "${title}" to group "${testGroups[groupIndex].title}"`
+    );
+
+    return {
+      successfully_added: true,
+      error: null,
+    };
+  }
+
+  return {
+    successfully_added: false,
+    error: "No test groups available to add test to",
+  };
+}
+
 function add_switch_connection_suggestion({
   title,
   description,
@@ -785,6 +901,22 @@ class EventHandler extends EventEmitter {
               response.arguments
             );
             const result = add_measure_voltage_test({
+              title,
+              description,
+              jsondata,
+              test_group_id,
+            });
+
+            openai_chat_history.push({
+              type: "function_call_output",
+              call_id: response.call_id,
+              output: JSON.stringify(result),
+            });
+          } else if (response.name === "add_high_low_voltage_test") {
+            const { title, description, jsondata, test_group_id } = JSON.parse(
+              response.arguments
+            );
+            const result = add_high_low_voltage_test({
               title,
               description,
               jsondata,
@@ -1423,6 +1555,31 @@ async function processCommand(command) {
           }
           // blink_row(test.jsondata.row_from, "on");
           // blink_row(test.jsondata.row_to, "blink2");
+        } else if (test.type === "add_high_low_voltage_test") {
+          // Handle high/low voltage test
+          console.log(`🔘 Processing high/low voltage test: ${test.title}`);
+          console.log(`Test data:`, test.jsondata);
+
+          // Extract the high/low pattern from the test data
+          const { high_low_pattern, high_low_row, blinkboard_digital_row } =
+            test.jsondata;
+
+          // For now, just blink the specified row to indicate the test is active
+          // Later, this can be enhanced to play the full sequence
+          if (high_low_row && !isNaN(Number(high_low_row))) {
+            blink_row(Number(high_low_row), "blink");
+            console.log(
+              `🔘 Blinking row ${high_low_row} for high/low voltage test`
+            );
+          }
+
+          // Also blink the digital command pin if specified
+          if (blinkboard_digital_row) {
+            blink_command_pin(blinkboard_digital_row, "blink");
+            console.log(
+              `🔘 Blinking digital pin ${blinkboard_digital_row} for high/low voltage test`
+            );
+          }
         }
 
         setTimeout(() => {
@@ -1646,61 +1803,80 @@ process.on("unhandledRejection", (reason, promise) => {
 
 // Initialize with some sample test groups
 testGroups = [
-  // {
-  //   id: "1",
-  //   title: "Circuit Validation Tests",
-  //   description:
-  //     "Basic validation tests for circuit components and connections",
-  //   tests: [
-  //     // {
-  //     //   name: "Component Connection Test",
-  //     //   description: "Verify all components are properly connected",
-  //     // },
-  //     // {
-  //     //   name: "Power Supply Test",
-  //     //   description: "Check power supply connections and voltage levels",
-  //     // },
-  //     // {
-  //     //   name: "Signal Flow Test",
-  //     //   description: "Validate signal paths through the circuit",
-  //     // },
-  //     {
-  //       id: "so_demo_1",
-  //       type: "self_observe",
-  //       title: "When you press the button, what does the LED do?",
-  //       description:
-  //         "Press and release the button a few times and describe the LED behavior.",
-  //       jsondata: { row: [10] },
-  //       userObservation: "",
-  //       completed: false,
-  //     },
-  //     {
-  //       id: "mv_demo_1",
-  //       type: "measure_voltage",
-  //       title: "Measure voltage at row 15 using A0",
-  //       description:
-  //         "Rotate the potentiometer from end to end while measuring the voltage.",
-  //       jsondata: { blinkboard_adc_row: "a0", measure_row: 15 },
-  //       blinkboardADCRow: "a0",
-  //       measureRow: 15,
-  //       completed: false,
-  //       voltageData: [],
-  //     },
-  //     {
-  //       id: "sc_demo_1",
-  //       type: "switch_connection_suggestion",
-  //       title: "Switch connection suggestion",
-  //       description:
-  //         "The student mistakenly connected pin 10 to pin 11. You should switch the connection to pin 12.",
-  //       jsondata: { row_from: "10", row_to: "gnd" },
-  //       row_from: "10",
-  //       row_to: "gnd",
-  //       userObservation: "",
-  //       completed: false,
-  //     },
-  //   ],
-  //   timestamp: Date.now(),
-  // },
+  {
+    id: "1",
+    title: "Circuit Validation Tests",
+    description:
+      "Basic validation tests for circuit components and connections",
+    tests: [
+      // {
+      //   name: "Component Connection Test",
+      //   description: "Verify all components are properly connected",
+      // },
+      // {
+      //   name: "Power Supply Test",
+      //   description: "Check power supply connections and voltage levels",
+      // },
+      // {
+      //   name: "Signal Flow Test",
+      //   description: "Validate signal paths through the circuit",
+      // },
+      {
+        id: "so_demo_1",
+        type: "self_observe",
+        title: "When you press the button, what does the LED do?",
+        description:
+          "Press and release the button a few times and describe the LED behavior.",
+        jsondata: { row: [10] },
+        userObservation: "",
+        completed: false,
+      },
+      {
+        id: "mv_demo_1",
+        type: "measure_voltage",
+        title: "Measure voltage at row 15 using A0",
+        description:
+          "Rotate the potentiometer from end to end while measuring the voltage.",
+        jsondata: { blinkboard_adc_row: "a0", measure_row: 15 },
+        blinkboardADCRow: "a0",
+        measureRow: 15,
+        completed: false,
+        voltageData: [],
+      },
+      {
+        id: "sc_demo_1",
+        type: "switch_connection_suggestion",
+        title: "Switch connection suggestion",
+        description:
+          "The student mistakenly connected pin 10 to pin 11. You should switch the connection to pin 12.",
+        jsondata: { row_from: "10", row_to: "gnd" },
+        row_from: "10",
+        row_to: "gnd",
+        userObservation: "",
+        completed: false,
+      },
+      {
+        id: "hl_demo_1",
+
+        type: "add_high_low_voltage_test",
+        title: "High/Low Voltage Test",
+        description: "Test the high/low voltage of the circuit.",
+        jsondata: {
+          blinkboard_digital_row: "d0",
+          high_low_row: 1,
+          high_low_pattern: [
+            { voltage: "high", duration: 1000 },
+            { voltage: "low", duration: 1000 },
+            { voltage: "high", duration: 500 },
+            { voltage: "low", duration: 500 },
+            { voltage: "high", duration: 1000 },
+          ],
+        },
+        completed: false,
+      },
+    ],
+    timestamp: Date.now(),
+  },
   // {
   //   id: "2",
   //   title: "Performance Tests",
