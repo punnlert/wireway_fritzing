@@ -297,7 +297,7 @@ const testing_tools = [
             connections: {
               type: "array",
               description:
-                "the connections of the component. e.g. [1, 2, 3] means the component is connected to the 1st, 2nd, and 3rd rows. some connections maybe crossing the middle of the board. e.g. [1, 26], or [n, n+25] n < 25.",
+                "the connections of the component. e.g. [1, 2, 3] means the component is connected to the 1st, 2nd, and 3rd rows. some connections maybe crossing the middle of the board. e.g. [1, 26], or [n, n+25] n < 25 (refer to the blinkboard schematics).",
               items: {
                 type: "number",
                 maximum: 50,
@@ -543,7 +543,7 @@ const suggesting_tools = [
             connections: {
               type: "array",
               description:
-                "the connections of the component. e.g. [1, 2, 3] means the component is connected to the 1st, 2nd, and 3rd rows. some connections maybe crossing the middle of the board. e.g. [1, 26], or [n, n+25] n < 25.",
+                "the connections of the component. e.g. [1, 2, 3] means the component is connected to the 1st, 2nd, and 3rd rows. some connections maybe crossing the middle of the board. e.g. [1, 26], or [n, n+25] n < 25 (refer to the blinkboard schematics).",
               items: {
                 type: "number",
                 maximum: 50,
@@ -1962,7 +1962,10 @@ async function processCommand(command) {
         );
 
         console.log("pins", pins);
-        blink_component(pins, "on");
+        blink_component(
+          pins.map((pin) => pin.connection),
+          "on"
+        );
 
         return {
           status: "success",
@@ -2118,20 +2121,26 @@ async function processCommand(command) {
           highlighted_components.forEach((component, index) => {
             const title = component.component_title || component.component_id;
             const row_numbers = component.pins
-              ? component.pins
-                  .map((pin) => convert_pinname_to_row_num(pin))
-                  .join(", ")
+              ? component.pins.reduce(
+                  (acc, pin) =>
+                    acc +
+                    `${convert_pinname_to_row_num(pin.connection)}(${
+                      pin.name
+                    }), `,
+                  ""
+                )
               : "No row connected";
             contextString += `${index + 1}. ${title} (ID: ${
               component.component_id
-            }) - Row Numbers: ${row_numbers}\n`;
+            }) - Connected at: ${row_numbers}\n`;
           });
 
           let query_text = `${message}${contextString}\n\nAdd any tests or suggestions if necessary. You can explain the test in your reply but you don't have to mention some trivial details like test_key`;
-          const response = await send_openai_message(query_text);
+          console.log("query_text", query_text);
+          // const response = await send_openai_message(query_text);
         } else {
           let query_text = `${message} \n Add any tests or suggestions if necessary. You can explain the test in your reply but you don't have to mention some trivial details like test_key`;
-          const response = await send_openai_message(query_text);
+          // const response = await send_openai_message(query_text);
         }
 
         return;

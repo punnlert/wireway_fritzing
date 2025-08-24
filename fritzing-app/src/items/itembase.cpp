@@ -1088,7 +1088,7 @@ void ItemBase::mousePressEvent(QGraphicsSceneMouseEvent *event) {
 		componentData["component_id"] = QString::number(m_id);
 		componentData["component_title"] = title();
 		
-		// Get actual breadboard pin connections
+		// Get actual breadboard pin connections with meaningful information
 		QJsonArray pinsArray;
 		const QList<ConnectorItem *> &connectors = cachedConnectorItems();
 		
@@ -1103,8 +1103,22 @@ void ItemBase::mousePressEvent(QGraphicsSceneMouseEvent *event) {
 								if (connectedItem) {
 									// Check if this is connected to a breadboard
 									if (connectedItem->viewID() == ViewLayer::BreadboardView) {
-										// Get the breadboard pin information
-										QString pinInfo = QString("%1").arg(connectedConnector->connectorSharedID());
+										// Create pin object with name and connection
+										QJsonObject pinInfo;
+										
+										// Get pin name/description from connector
+										QString pinName = connector->connectorSharedName();
+										if (pinName.isEmpty()) {
+											// Fallback to connector ID if name is empty
+											pinName = QString("Pin %1").arg(connector->connectorSharedID());
+										}
+										
+										// Get breadboard connection location
+										QString connection = connectedConnector->connectorSharedID();
+										
+										pinInfo["name"] = pinName;
+										pinInfo["connection"] = connection;
+										
 										pinsArray.append(pinInfo);
 									}
 								}
@@ -1159,7 +1173,7 @@ void ItemBase::mouseDoubleClickEvent(QGraphicsSceneMouseEvent *event)
 		componentData["component_id"] = QString::number(m_id);
 		componentData["component_title"] = title();
 		
-		// Get actual breadboard pin connections
+		// Get actual breadboard pin connections with meaningful information
 		QJsonArray pinsArray;
 		const QList<ConnectorItem *> &connectors = cachedConnectorItems();
 		
@@ -1174,8 +1188,22 @@ void ItemBase::mouseDoubleClickEvent(QGraphicsSceneMouseEvent *event)
 								if (connectedItem) {
 									// Check if this is connected to a breadboard
 									if (connectedItem->viewID() == ViewLayer::BreadboardView) {
-										// Get the breadboard pin information
-										QString pinInfo = QString("%1").arg(connectedConnector->connectorSharedID());
+										// Create pin object with name and connection
+										QJsonObject pinInfo;
+										
+										// Get pin name/description from connector
+										QString pinName = connector->connectorSharedName();
+										if (pinName.isEmpty()) {
+											// Fallback to connector ID if name is empty
+											pinName = QString("Pin %1").arg(connector->connectorSharedID());
+										}
+										
+										// Get breadboard connection location
+										QString connection = connectedConnector->connectorSharedID();
+										
+										pinInfo["name"] = pinName;
+										pinInfo["connection"] = connection;
+										
 										pinsArray.append(pinInfo);
 									}
 								}
