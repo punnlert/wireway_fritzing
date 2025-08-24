@@ -42,6 +42,7 @@ public slots:
   void handleMeasureRequest(const QJsonObject &test);
   void handleComponentHighlighted(const QJsonObject& componentData);
   void handleMultipleComponentsSelected(const QJsonArray& componentsData);
+  void handleComponentDeselected(const QString& componentId);
 
 signals:
   void testsReceived(const QJsonArray &tests);

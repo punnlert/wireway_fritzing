@@ -263,6 +263,7 @@ signals:
   void externalProcessSignal(QString &name, QString &path, QStringList &args);
   void breadboardComponentHighlighted(const QJsonObject& componentData);
   void multipleBreadboardComponentsSelected(const QJsonArray& componentsData);
+  void breadboardComponentDeselected(const QString& componentId);
 
 public slots:
   void ensureClosable();
@@ -293,6 +294,7 @@ public slots:
   void showWelcomeView();
   void handleBreadboardComponentHighlighted(const QJsonObject& componentData);
   void handleMultipleBreadboardComponentsSelected(const QJsonArray& componentsData);
+  void handleBreadboardComponentDeselected(const QString& componentId);
 
 protected slots:
   void mainLoad();

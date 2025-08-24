@@ -727,6 +727,10 @@ void MainWindow::connectPairs() {
 	succeeded =  succeeded && connect(m_breadboardGraphicsView, SIGNAL(multipleBreadboardComponentsSelectedSignal(QJsonArray)),
 	                                  this, SLOT(handleMultipleBreadboardComponentsSelected(QJsonArray)));
 
+	// Connect the component deselection signal from breadboard view to MainWindow
+	succeeded =  succeeded && connect(m_breadboardGraphicsView, SIGNAL(breadboardComponentDeselectedSignal(QString)),
+	                                  this, SLOT(handleBreadboardComponentDeselected(QString)));
+
 
 	if (!succeeded) {
 		DebugDialog::debug("connectPair failed");
@@ -3216,4 +3220,9 @@ void MainWindow::handleBreadboardComponentHighlighted(const QJsonObject& compone
 void MainWindow::handleMultipleBreadboardComponentsSelected(const QJsonArray& componentsData) {
 	// Emit the signal to the BlinkBoardWidget
 	emit multipleBreadboardComponentsSelected(componentsData);
+}
+
+void MainWindow::handleBreadboardComponentDeselected(const QString& componentId) {
+	// Emit the signal to the BlinkBoardWidget
+	emit breadboardComponentDeselected(componentId);
 }

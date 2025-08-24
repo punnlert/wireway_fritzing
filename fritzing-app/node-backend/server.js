@@ -725,19 +725,7 @@ class EventHandler extends EventEmitter {
           (output) => output.type === "function_call"
         );
 
-        // console.log("function_calls", function_calls);
-        console.log(event);
-
         if (function_calls.length > 0) {
-          const set_count = testGroups.length + 1;
-
-          // testGroups.push({
-          //   id: Date.now().toString(),
-          //   title: `Debug ${set_count}`,
-          //   description: `Debug ${set_count}`,
-          //   tests: [],
-          // });
-          // console.log("testGroups", testGroups);
           this.handle_function_calls(function_calls);
           process.stdout.write(
             JSON.stringify({
@@ -748,8 +736,6 @@ class EventHandler extends EventEmitter {
           );
         }
       } else if (event.type === "response.output_text.done") {
-        // TODO: tell the frontend that the output is done
-
         process.stdout.write(
           JSON.stringify({
             type: "chat",

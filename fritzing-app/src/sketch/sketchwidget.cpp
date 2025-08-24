@@ -55,6 +55,7 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include "../items/ruler.h"
 #include "../items/symbolpaletteitem.h"
 #include "../items/wire.h"
+#include "../items/breadboard.h"
 #include "../commands.h"
 #include "../model/modelpart.h"
 #include "../debugdialog.h"
@@ -3011,6 +3012,11 @@ void SketchWidget::mouseMoveEvent(QMouseEvent *event) {
 		return;
 	}
 
+	// Check for component deselection when mouse moves away while button is pressed
+	if ((event->buttons() & Qt::LeftButton) && m_viewID == ViewLayer::BreadboardView) {
+		checkComponentDeselection(scenePos);
+	}
+
 	if (m_savedItems.count() > 0) {
 		if ((event->buttons() & Qt::LeftButton) && !draggingWireEnd()) {
 			m_globalPos = event->globalPos();
@@ -3066,6 +3072,35 @@ void SketchWidget::mouseMoveEvent(QMouseEvent *event) {
 
 	QGraphicsView::mouseMoveEvent(event);
 	unsquashShapes();
+}
+
+void SketchWidget::checkComponentDeselection(const QPointF &scenePos) {
+	// Get currently selected items
+	QList<QGraphicsItem *> selectedItems = this->scene()->selectedItems();
+	
+	// Check if any selected breadboard components are no longer under the mouse
+	foreach (QGraphicsItem *item, selectedItems) {
+		ItemBase *itemBase = dynamic_cast<ItemBase *>(item);
+		if (!itemBase || itemBase->viewID() != ViewLayer::BreadboardView) {
+			continue;
+		}
+		
+		// Skip breadboards and wires - only check actual electronic components
+		if (dynamic_cast<Breadboard*>(itemBase) || dynamic_cast<Wire*>(itemBase)) {
+			continue;
+		}
+		
+		// Check if the mouse is still within this component's bounds
+		QPointF localPos = itemBase->mapFromScene(scenePos);
+		if (!itemBase->contains(localPos)) {
+			// Mouse has moved outside this component while button is pressed
+			// Deselect this component
+			itemBase->setSelected(false);
+			
+			// Emit deselection signal for blinkboard
+			emit breadboardComponentDeselectedSignal(QString::number(itemBase->id()));
+		}
+	}
 }
 
 QString SketchWidget::makeMoveSVG(double printerScale, double dpi, QPointF & offset)

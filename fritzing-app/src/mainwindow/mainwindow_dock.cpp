@@ -281,6 +281,10 @@ void MainWindow::initDock() {
   connect(this, &MainWindow::multipleBreadboardComponentsSelected,
           m_blinkboardWidget, &BlinkBoardWidget::handleMultipleComponentsSelected);
 
+  // Connect MainWindow's component deselection signal to BlinkBoardWidget
+  connect(this, &MainWindow::breadboardComponentDeselected,
+          m_blinkboardWidget, &BlinkBoardWidget::handleComponentDeselected);
+
   // DebugDialog::debug("after creating bins");
   if (m_fileProgressDialog) {
     m_fileProgressDialog->setValue(89);

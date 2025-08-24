@@ -371,6 +371,7 @@ protected:
 	void addToScene(ItemBase * item, ViewLayer::ViewLayerID viewLayerID);
 	ConnectorItem * findConnectorItem(ItemBase * item, const QString & connectorID, ViewLayer::ViewLayerPlacement);
 	bool checkMoved(bool wait);
+	void checkComponentDeselection(const QPointF &scenePos);
 
 	void changeConnectionAux(long fromID, const QString & fromConnectorID,
 	                         long toID, const QString & toConnectorID,
@@ -536,6 +537,7 @@ signals:
 	void cleanUpWiresSignal(CleanUpWiresCommand *);
 	void selectionChangedSignal();
 	void multipleBreadboardComponentsSelectedSignal(const QJsonArray& componentsData);
+	void breadboardComponentDeselectedSignal(const QString& componentId);
 
 	void resizeSignal();
 	void dropSignal(const QPoint &pos);

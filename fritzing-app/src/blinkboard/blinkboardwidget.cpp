@@ -1019,6 +1019,14 @@ void BlinkBoardWidget::handleMultipleComponentsSelected(const QJsonArray& compon
   updateHighlightedComponentsDisplay();
 }
 
+void BlinkBoardWidget::handleComponentDeselected(const QString& componentId) {
+  qDebug() << "=== COMPONENT DESELECTED ===";
+  qDebug() << "Component ID:" << componentId;
+  
+  // Remove the deselected component from highlighted components
+  removeHighlightedComponent(componentId);
+}
+
 void BlinkBoardWidget::addHighlightedComponent(const QJsonObject& componentData) {
   // Check if component is already highlighted
   for (int i = 0; i < m_highlightedComponents.size(); ++i) {
