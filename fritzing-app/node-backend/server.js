@@ -32,9 +32,9 @@ the blinkboard also has a built-in analog and digital I/O rows that can be used 
 - rows D0, D1 can be used to output high and low voltage and PWM.
 - row D2 can be used to output analog voltage between 0 and 4.5V.
 
-Your job is to help the student debug the circuit using your understanding of the circuit
-
-If the student is simply making a miswiring mistake, you should just suggest them to fix it. Only add tests if you have suspision about something. Don't add extensive tests. ONLY ADD THEM WHEN YOU FEEL NECESSARY.
+The user can choose for you to behave in two different modes:
+- asking mode: the student will ask you general question about the circuit that does not require you to form any hypothesis that needs to be tested. e.g. the specification of a components, where to connect a component, where should somethign occur, etc. In this mode, you can make suggestions to correct any obvious mistakes.
+- testing mode: the student will ask you questions that you would need some information of the current state of the circuit to answer. e.g. why is the reading from my potentiometer not changing, why is the LED not lighting up, etc. In this mode, you have to form some hypothesis about why the situation is happening and then add tests to debug the circuit according to your hypothesis. If the student is simply making a miswiring mistake, you should just suggest them to fix it. Only add tests if you have suspision about something. Don't add extensive tests. ONLY ADD THEM WHEN YOU FEEL NECESSARY.
 `;
 
 const openai = new OpenAI({
@@ -47,6 +47,9 @@ let schematic_file_change = false;
 let testGroups = []; // Store test groups for the test window
 
 let openai_chat_context = [];
+
+let global_mode = "asking";
+let mode_changed = false;
 
 // Serial port detection
 let serialPorts = [];
@@ -70,23 +73,85 @@ function createErrorResponse(error, lineNumber) {
   };
 }
 
-const tools = [
-  // {
-  //   type: "function",
-  //   name: "add_test_group",
-  //   description:
-  //     "Adding a test group. One test group should have only one goal that you want to prove.",
-  //   parameters: {
-  //     type: "object",
-  //     properties: {
-  //       title: { type: "string" },
-  //       description: { type: "string" },
-  //     },
-  //     required: ["title", "description"],
-  //     additionalProperties: false,
-  //   },
-  //   strict: true,
-  // },
+const testing_tools = [
+  {
+    type: "function",
+    name: "add_self_observe_test",
+    description:
+      "Adding a test that ask the student to describe something about the circuit. For example, if you push X button, does Y light up",
+    parameters: {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        description: { type: "string" },
+        test_group_id: {
+          type: "string",
+          description:
+            "the id of the test group to add the test to. you must provide it every time for it to be added to the correct group. if you don't have any test group available, you can add a test group first by calling the add_test_group function",
+        },
+        jsondata: {
+          type: "object",
+          properties: {
+            row: {
+              type: "array",
+              items: { type: "number", maximum: 50, minimum: 1 },
+              description:
+                "rows that you want to blink to better support your message",
+            },
+          },
+          required: ["row"],
+          additionalProperties: false,
+        },
+      },
+      required: ["title", "description", "jsondata", "test_group_id"],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    type: "function",
+    name: "add_measure_voltage_test",
+    description:
+      "Ask the student to measure voltage at any row on the BlinkBoard. Records the voltage at 500ms interval for 10 seconds. You can describe some of the instruction in the description e.g. rotate the potentionmeter from one end to the other as you measure, bend the flex sensor repeatedly as you measure, etc.",
+    parameters: {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        description: {
+          type: "string",
+          description:
+            "this should explain the reason why you administered this test",
+        },
+        test_group_id: {
+          type: "string",
+          description:
+            "the id of the test group to add the test to. you must provide it every time for it to be added to the correct group. if you don't have any test group available, you can add a test group first by calling the add_test_group function",
+        },
+        jsondata: {
+          type: "object",
+          properties: {
+            blinkboard_adc_row: {
+              type: "string",
+              description:
+                "you can decide by yourself which ADC row to use for measuring. this is the blinkboard built-in adc rows",
+              enum: ["a0", "a1", "a2"],
+            },
+            measure_row: {
+              type: "number",
+              description: "the row which you want to measure voltage",
+              maximum: 50,
+              minimum: 1,
+            },
+          },
+          required: ["blinkboard_adc_row", "measure_row"],
+          additionalProperties: false,
+        },
+      },
+      required: ["title", "description", "jsondata", "test_group_id"],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
   {
     type: "function",
     name: "add_switch_connection_suggestion",
@@ -247,84 +312,6 @@ const tools = [
   },
   {
     type: "function",
-    name: "add_self_observe_test",
-    description:
-      "Adding a test that ask the student to describe something about the circuit. For example, if you push X button, does Y light up",
-    parameters: {
-      type: "object",
-      properties: {
-        title: { type: "string" },
-        description: { type: "string" },
-        test_group_id: {
-          type: "string",
-          description:
-            "the id of the test group to add the test to. you must provide it every time for it to be added to the correct group. if you don't have any test group available, you can add a test group first by calling the add_test_group function",
-        },
-        jsondata: {
-          type: "object",
-          properties: {
-            row: {
-              type: "array",
-              items: { type: "number", maximum: 50, minimum: 1 },
-              description:
-                "rows that you want to blink to better support your message",
-            },
-          },
-          required: ["row"],
-          additionalProperties: false,
-        },
-      },
-      required: ["title", "description", "jsondata", "test_group_id"],
-      additionalProperties: false,
-    },
-    strict: true,
-  },
-  {
-    type: "function",
-    name: "add_measure_voltage_test",
-    description:
-      "Ask the student to measure voltage at any row on the BlinkBoard. Records the voltage at 500ms interval for 10 seconds. You can describe some of the instruction in the description e.g. rotate the potentionmeter from one end to the other as you measure, bend the flex sensor repeatedly as you measure, etc.",
-    parameters: {
-      type: "object",
-      properties: {
-        title: { type: "string" },
-        description: {
-          type: "string",
-          description:
-            "this should explain the reason why you administered this test",
-        },
-        test_group_id: {
-          type: "string",
-          description:
-            "the id of the test group to add the test to. you must provide it every time for it to be added to the correct group. if you don't have any test group available, you can add a test group first by calling the add_test_group function",
-        },
-        jsondata: {
-          type: "object",
-          properties: {
-            blinkboard_adc_row: {
-              type: "string",
-              description:
-                "you can decide by yourself which ADC row to use for measuring. this is the blinkboard built-in adc rows",
-              enum: ["a0", "a1", "a2"],
-            },
-            measure_row: {
-              type: "number",
-              description: "the row which you want to measure voltage",
-              maximum: 50,
-              minimum: 1,
-            },
-          },
-          required: ["blinkboard_adc_row", "measure_row"],
-          additionalProperties: false,
-        },
-      },
-      required: ["title", "description", "jsondata", "test_group_id"],
-      additionalProperties: false,
-    },
-    strict: true,
-  },
-  {
-    type: "function",
     name: "add_test_group",
     description:
       "Adding a test group. One test group should have only one goal that you want to prove. Must be called before adding any test.",
@@ -335,6 +322,183 @@ const tools = [
         description: { type: "string" },
       },
       required: ["title", "description"],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+];
+
+const suggesting_tools = [
+  {
+    type: "function",
+    name: "add_suggestion_group",
+    description:
+      "Adding a suggestion group. One suggestion group should have only one goal that you want to prove. Must be called before adding any suggestion.",
+    parameters: {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        description: { type: "string" },
+      },
+      required: ["title", "description"],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    type: "function",
+    name: "add_switch_connection_suggestion",
+    description:
+      "Sometimes, the student might mistakenly connect some pins in the wrong hole. This is how we suggest them to fix it.",
+    parameters: {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        description: { type: "string" },
+        test_group_id: {
+          type: "string",
+          description:
+            "the id of the test group to add the test to. you must provide it every time for it to be added to the correct group. if you don't have any test group available, you can add a test group first by calling the add_test_group function",
+        },
+        jsondata: {
+          type: "object",
+          properties: {
+            row_from: {
+              type: "string",
+              enum: [
+                "1",
+                "2",
+                "3",
+                "4",
+                "5",
+                "6",
+                "7",
+                "8",
+                "9",
+                "10",
+                "11",
+                "12",
+                "13",
+                "14",
+                "15",
+                "16",
+                "17",
+                "18",
+                "19",
+                "20",
+                "21",
+                "22",
+                "23",
+                "24",
+                "25",
+                "26",
+                "27",
+                "28",
+                "29",
+                "30",
+                "31",
+                "32",
+                "33",
+                "34",
+                "35",
+                "36",
+                "37",
+                "38",
+                "39",
+                "40",
+                "41",
+                "42",
+                "43",
+                "44",
+                "45",
+                "46",
+                "47",
+                "48",
+                "49",
+                "50",
+                "a0",
+                "a1",
+                "a2",
+                "d0",
+                "d1",
+                "d2",
+                "vcc",
+                "gnd",
+              ],
+              description:
+                "the row that the student mistakenly connected. please note that these are the rows name for all rows available on the blinkboards. other component may have pins with the same name. be careful to not make mistake.",
+            },
+            row_to: {
+              type: "string",
+              description:
+                "the row that the student should connect to. please note that these are the rows name for all rows available on the blinkboards. other component may have pins with the same name. be careful to not make mistake.",
+              enum: [
+                "1",
+                "2",
+                "3",
+                "4",
+                "5",
+                "6",
+                "7",
+                "8",
+                "9",
+                "10",
+                "11",
+                "12",
+                "13",
+                "14",
+                "15",
+                "16",
+                "17",
+                "18",
+                "19",
+                "20",
+                "21",
+                "22",
+                "23",
+                "24",
+                "25",
+                "26",
+                "27",
+                "28",
+                "29",
+                "30",
+                "31",
+                "32",
+                "33",
+                "34",
+                "35",
+                "36",
+                "37",
+                "38",
+                "39",
+                "40",
+                "41",
+                "42",
+                "43",
+                "44",
+                "45",
+                "46",
+                "47",
+                "48",
+                "49",
+                "50",
+                "a0",
+                "a1",
+                "a2",
+                "d0",
+                "d1",
+                "d2",
+                "vcc",
+                "gnd",
+              ],
+            },
+          },
+          required: ["row_from", "row_to"],
+          additionalProperties: false,
+        },
+      },
+      required: ["title", "description", "jsondata", "test_group_id"],
       additionalProperties: false,
     },
     strict: true,
@@ -662,7 +826,10 @@ class EventHandler extends EventEmitter {
               call_id: response.call_id,
               output: JSON.stringify(result),
             });
-          } else if (response.name === "add_test_group") {
+          } else if (
+            response.name === "add_test_group" ||
+            response.name === "add_suggestion_group"
+          ) {
             const { title, description } = JSON.parse(response.arguments);
             const result = add_test_group({ title, description });
 
@@ -680,7 +847,7 @@ class EventHandler extends EventEmitter {
       model: gpt_model,
       input: openai_chat_history,
       stream: true,
-      tools,
+      tools: global_mode === "testing" ? testing_tools : suggesting_tools,
       reasoning: gpt_reasoning,
     };
 
@@ -1027,7 +1194,7 @@ function request_voltage_data() {
   });
 }
 
-async function send_openai_message(message, mode) {
+async function send_openai_message(message) {
   const eventHandler = new EventHandler(openai);
   eventHandler.on("event", eventHandler.onEvent.bind(eventHandler));
 
@@ -1038,7 +1205,13 @@ async function send_openai_message(message, mode) {
     });
   }
 
-  // console.log("schematic_file_change", schematic_file_change);
+  if (mode_changed) {
+    openai_chat_history.push({
+      role: "developer",
+      content: `the operation mode has been changed to ${global_mode}`,
+    });
+    mode_changed = false;
+  }
 
   if (schematic_file_change) {
     const update_schematics = `this is the .yaml representation of the schematics \n ${schematics.schematics_yaml} \n `;
@@ -1058,42 +1231,20 @@ async function send_openai_message(message, mode) {
     content: message,
   });
 
-  // Accumulate the complete response content
-  let completeResponse = "";
-
   const create_param = {
     model: gpt_model,
     input: openai_chat_history,
     stream: true,
-    tools,
+    tools: global_mode === "testing" ? testing_tools : suggesting_tools,
     reasoning: gpt_reasoning,
   };
-
-  // console.log("create_param", create_param);
-  // console.log("chat_history", openai_chat_history);
 
   const response = await openai.responses.create(create_param);
 
   for await (const event of response) {
-    // Accumulate content instead of streaming it
-    // if (event.type === "response.output_text.delta") {
-    //   completeResponse += event.delta;
-    // }
-
     // Also emit to event handler for internal processing
     eventHandler.emit("event", event);
   }
-
-  // Send the complete response when streaming is done
-  // if (completeResponse.trim()) {
-  //   console.log(
-  //     JSON.stringify({
-  //       type: "chat",
-  //       message: completeResponse,
-  //       timestamp: Date.now(),
-  //     })
-  //   );
-  // }
 
   return "success";
 }
@@ -1441,6 +1592,11 @@ async function processCommand(command) {
         console.log(`Highlighted components:`, highlighted_components);
         console.log(`Mode: ${mode}`);
 
+        if (global_mode !== mode) {
+          global_mode = mode;
+          mode_changed = true;
+        }
+
         // Check if highlighted components are provided
         if (
           highlighted_components &&
@@ -1462,10 +1618,10 @@ async function processCommand(command) {
           });
 
           let query_text = `${message}${contextString}\n\nAdd any tests or suggestions if necessary. You can explain the test in your reply but you don't have to mention some trivial details like test_key`;
-          const response = await send_openai_message(query_text, mode);
+          const response = await send_openai_message(query_text);
         } else {
           let query_text = `${message} \n Add any tests or suggestions if necessary. You can explain the test in your reply but you don't have to mention some trivial details like test_key`;
-          const response = await send_openai_message(query_text, mode);
+          const response = await send_openai_message(query_text);
         }
 
         return;
