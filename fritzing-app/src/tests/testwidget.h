@@ -65,6 +65,7 @@ private:
     QLineEdit* createHighLowVoltageTestDisplay(const QJsonObject &test, QWidget *parent, QVBoxLayout *parentLayout);
     void createSwitchConnectionSuggestionTestDisplay(const QJsonObject &test, QWidget *parent, QVBoxLayout *parentLayout);
     QLineEdit* createAnalogVoltageTestDisplay(const QJsonObject &test, QWidget *parent, QVBoxLayout *parentLayout);
+    void createNewComponentSuggestionTestDisplay(const QJsonObject &test, QWidget *parent, QVBoxLayout *parentLayout);
     void clearCards();
     
     // Playhead animation methods

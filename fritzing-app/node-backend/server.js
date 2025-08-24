@@ -263,6 +263,19 @@ const testing_tools = [
   },
   {
     type: "function",
+    name: "request_schematics",
+    description:
+      "Request the schematics of the circuit. This is useful when you want to be reminded of how the circuit is wired. You can request the schematics of the circuit and then add the component to the circuit.",
+    parameters: {
+      type: "object",
+      properties: {},
+      required: [],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    type: "function",
     name: "add_switch_connection_suggestion",
     description:
       "Sometimes, the student might mistakenly connect some pins in the wrong hole. This is how we suggest them to fix it.",
@@ -450,6 +463,57 @@ const suggesting_tools = [
         description: { type: "string" },
       },
       required: ["title", "description"],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    type: "function",
+    name: "request_schematics",
+    description:
+      "Request the schematics of the circuit. This is useful when you want to be reminded of how the circuit is wired. You can request the schematics of the circuit and then add the component to the circuit.",
+    parameters: {
+      type: "object",
+      properties: {},
+      required: [],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    type: "function",
+    name: "add_new_component_suggestion",
+    description:
+      "If there's a component that you think should be added in the circuit, you can add a suggestion here. e.g. add a resistor to the circuit",
+    parameters: {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        description: { type: "string" },
+        test_group_id: {
+          type: "string",
+          description:
+            "the id of the test group to add the test to. you must provide it every time for it to be added to the correct group. if you don't have any test group available, you can add a test group first by calling the add_test_group function",
+        },
+        jsondata: {
+          type: "object",
+          properties: {
+            component_name: { type: "string" },
+            component_value: { type: "string" },
+            connections: {
+              type: "array",
+              description:
+                "the connections of the component. e.g. [1, 2, 3] means the component is connected to the 1st, 2nd, and 3rd rows",
+              items: {
+                type: "number",
+                maximum: 50,
+                minimum: 1,
+              },
+            },
+          },
+        },
+      },
+      required: ["title", "description", "jsondata", "test_group_id"],
       additionalProperties: false,
     },
     strict: true,
@@ -877,6 +941,71 @@ function add_switch_connection_suggestion({
   }
 }
 
+function add_new_component_suggestion({
+  title,
+  description,
+  jsondata,
+  test_group_id,
+}) {
+  console.log("add_switch_connection_suggestion", title, description, jsondata);
+
+  if (testGroups.length > 0) {
+    const groupIndex = testGroups.findIndex(
+      (group) => group.id === test_group_id
+    );
+
+    if (groupIndex === -1) {
+      console.log("❌ Test group not found");
+      return {
+        successfully_added: false,
+        error: "Test group not found",
+      };
+    }
+
+    // Create new test object
+    const newTest = {
+      id: `test_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      type: "new_component_suggestion",
+      title: title,
+      description: description,
+      jsondata: jsondata || {},
+      component_name: jsondata?.component_name || "",
+      component_value: jsondata?.component_value || "",
+      connections: jsondata?.connections || [],
+      completed: false,
+    };
+
+    // Add test to the latest group
+    testGroups[groupIndex].tests.push(newTest);
+
+    console.log(
+      `✅ Added measure voltage test "${title}" to group "${testGroups[groupIndex].title}"`
+    );
+
+    return {
+      successfully_added: true,
+      error: null,
+    };
+  } else {
+    console.log(
+      "⚠️ No test groups available. Cannot add measure voltage test."
+    );
+
+    return {
+      successfully_added: false,
+      error: "No test groups available to add test to",
+    };
+  }
+}
+
+function request_schematics() {
+  return {
+    status: "success",
+    message: schematics.schematics_yaml,
+    timestamp: Date.now(),
+  };
+}
+
 function add_test_group({ title, description }) {
   const id = crypto.randomUUID();
   testGroups.push({
@@ -1050,12 +1179,36 @@ class EventHandler extends EventEmitter {
               call_id: response.call_id,
               output: JSON.stringify(result),
             });
+          } else if (response.name === "add_new_component_suggestion") {
+            const { title, description, jsondata, test_group_id } = JSON.parse(
+              response.arguments
+            );
+            const result = add_new_component_suggestion({
+              title,
+              description,
+              jsondata,
+              test_group_id,
+            });
+
+            openai_chat_history.push({
+              type: "function_call_output",
+              call_id: response.call_id,
+              output: JSON.stringify(result),
+            });
           } else if (
             response.name === "add_test_group" ||
             response.name === "add_suggestion_group"
           ) {
             const { title, description } = JSON.parse(response.arguments);
             const result = add_test_group({ title, description });
+
+            openai_chat_history.push({
+              type: "function_call_output",
+              call_id: response.call_id,
+              output: JSON.stringify(result),
+            });
+          } else if (response.name === "request_schematics") {
+            const result = request_schematics();
 
             openai_chat_history.push({
               type: "function_call_output",
@@ -1987,6 +2140,18 @@ testGroups = [
         title: "Output 1.5V to row 1",
         description: "Output 1.5V to row 1",
         jsondata: { output_row: 1, output_voltage: 1.5 },
+        completed: false,
+      },
+      {
+        id: "nc_demo_1",
+        type: "new_component_suggestion",
+        title: "Add a resistor to the circuit",
+        description: "Add a resistor to the circuit",
+        jsondata: {
+          component_name: "resistor",
+          component_value: "1k",
+          connections: [1, 26],
+        },
         completed: false,
       },
     ],

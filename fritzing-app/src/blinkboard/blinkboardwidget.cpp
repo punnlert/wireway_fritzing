@@ -166,12 +166,12 @@ BlinkBoardWidget::BlinkBoardWidget(QWidget *parent)
   // Add chat interface at the top
   m_mainLayout->addWidget(m_chatDisplay);
   
-  // Add help text for highlighted components
-  QLabel *helpLabel = new QLabel("💡 Highlight electronic components (resistors, LEDs, etc.) in the breadboard view to include them as context in your chat messages. Highlighted components are automatically included when you send a message.");
-  helpLabel->setStyleSheet("QLabel { color: #666; font-style: italic; padding: 5px; background-color: #f9f9f9; border: 1px solid #e0e0e0; border-radius: 3px; font-family: 'Droid Sans'; font-size: 9px; }");
-  helpLabel->setWordWrap(true);
-  helpLabel->setAlignment(Qt::AlignLeft | Qt::AlignTop);
-  m_mainLayout->addWidget(helpLabel);
+  // // Add help text for highlighted components
+  // QLabel *helpLabel = new QLabel("💡 Highlight electronic components (resistors, LEDs, etc.) in the breadboard view to include them as context in your chat messages. Highlighted components are automatically included when you send a message.");
+  // helpLabel->setStyleSheet("QLabel { color: #666; font-style: italic; padding: 5px; background-color: #f9f9f9; border: 1px solid #e0e0e0; border-radius: 3px; font-family: 'Droid Sans'; font-size: 9px; }");
+  // helpLabel->setWordWrap(true);
+  // helpLabel->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+  // m_mainLayout->addWidget(helpLabel);
   
   // Add highlighted components display
   m_highlightedComponentsLabel = new QLabel("No components highlighted");

@@ -240,6 +240,47 @@ void TestWidget::onSubmitTestResults(const QString &groupId, const QList<QLineEd
                 testResult["answer"] = "";
                 qDebug() << "⚠️ No input field found for analog voltage test";
             }
+        } else if (testType == "new_component_suggestion") {
+            // Read the latest completion status from m_testGroups (updated by the toggle), same as switch_connection_suggestion
+            const QString testId = testData[i]["id"].toString();
+            QString completionStatus;
+            bool foundInSpecifiedGroup = false;
+
+            // Try to find the test in the specified group first
+            for (int groupIndex = 0; groupIndex < m_testGroups.size(); ++groupIndex) {
+                QJsonObject groupObj = m_testGroups[groupIndex].toObject();
+                if (groupObj["id"].toString() == groupId) {
+                    QJsonArray testsArr = groupObj["tests"].toArray();
+                    for (int ti = 0; ti < testsArr.size(); ++ti) {
+                        QJsonObject tObj = testsArr[ti].toObject();
+                        if (tObj["id"].toString() == testId) {
+                            completionStatus = tObj["userObservation"].toString();
+                            foundInSpecifiedGroup = true;
+                            break;
+                        }
+                    }
+                    break;
+                }
+            }
+
+            // Fallback: scan all groups for robustness
+            if (!foundInSpecifiedGroup && completionStatus.isEmpty()) {
+                for (int groupIndex = 0; groupIndex < m_testGroups.size(); ++groupIndex) {
+                    QJsonArray testsArr = m_testGroups[groupIndex].toObject()["tests"].toArray();
+                    for (int ti = 0; ti < testsArr.size(); ++ti) {
+                        QJsonObject tObj = testsArr[ti].toObject();
+                        if (tObj["id"].toString() == testId) {
+                            completionStatus = tObj["userObservation"].toString();
+                            break;
+                        }
+                    }
+                    if (!completionStatus.isEmpty()) break;
+                }
+            }
+
+            if (completionStatus.isEmpty()) completionStatus = "incomplete";
+            testResult["answer"] = completionStatus;
+            qDebug() << "🔧 New component suggestion completion status (from m_testGroups):" << completionStatus;
         } else {
             // Get the answer from input field if available, otherwise empty string
             if (i < testInputs.size() && testInputs[i]) {
@@ -320,7 +361,7 @@ void TestWidget::createTestGroupCard(const QJsonObject &testGroup)
     
     // Tests to be performed (middle section)
     QJsonArray tests = testGroup["tests"].toArray();
-    QList<QLineEdit*> testInputs; // Store references to input fields
+        QList<QLineEdit*> testInputs; // Store references to input fields
     QList<QJsonObject> testData; // Store test data for submission
     
     if (!tests.isEmpty()) {
@@ -357,6 +398,9 @@ void TestWidget::createTestGroupCard(const QJsonObject &testGroup)
                     testInputs.append(input);
                     testData.append(test);
                 }
+            } else if (testType == "new_component_suggestion") {
+                createNewComponentSuggestionTestDisplay(test, card, cardLayout);
+                testData.append(test);
             } else {
                 // Minimal display for other test types
                 QString testName = test["name"].toString();
@@ -837,6 +881,163 @@ QLineEdit* TestWidget::createAnalogVoltageTestDisplay(const QJsonObject &test, Q
     
     qDebug() << "✅ Analog voltage test displayed in TestWidget:" << test["title"].toString();
     return observationInput; // Return the input field
+}
+
+void TestWidget::createNewComponentSuggestionTestDisplay(const QJsonObject &test, QWidget *parent, QVBoxLayout *parentLayout)
+{
+    // Create test container widget with consistent styling
+    QFrame *testWidget = new QFrame(parent);
+    testWidget->setStyleSheet("QFrame { background-color: #d6d6d6; padding: 5px; margin: 5px; }");
+    
+    QVBoxLayout *testLayout = new QVBoxLayout(testWidget);
+    testLayout->setContentsMargins(10, 10, 10, 10);
+    testLayout->setSpacing(8);
+    
+    // Test title - consistent with other tests
+    QLabel *titleLabel = new QLabel(test["title"].toString());
+    titleLabel->setStyleSheet("QLabel { font-family: 'Droid Sans'; font-size: 12px; font-weight: bold; color: #333; }");
+    testLayout->addWidget(titleLabel);
+    
+    // Test description - consistent with other tests
+    QLabel *descLabel = new QLabel(test["description"].toString());
+    descLabel->setStyleSheet("QLabel { font-family: 'Droid Sans'; font-size: 10px; color: #666; }");
+    descLabel->setWordWrap(true);
+    testLayout->addWidget(descLabel);
+    
+    // Middle section - component suggestion text
+    QJsonObject jsondata = test["jsondata"].toObject();
+    QString componentName = jsondata["component_name"].toString();
+    QString componentValue = jsondata["component_value"].toString();
+    QJsonArray connections = jsondata["connections"].toArray();
+    
+    qDebug() << "🔧 New component suggestion data:";
+    qDebug() << "  - Full test object:" << test;
+    qDebug() << "  - JSON data object:" << jsondata;
+    qDebug() << "  - Component name:" << componentName;
+    qDebug() << "  - Component value:" << componentValue;
+    qDebug() << "  - Connections array:" << connections;
+    qDebug() << "  - Connections size:" << connections.size();
+    if (connections.size() > 0) {
+        qDebug() << "  - First connection value:" << connections[0].toVariant();
+        qDebug() << "  - First connection type:" << connections[0].type();
+    } else {
+        qDebug() << "  - First connection value: none";
+        qDebug() << "  - First connection type: none";
+    }
+    
+    // Build the row numbers string manually
+    QString rowNumbersStr;
+    for (int i = 0; i < connections.size(); ++i) {
+        QJsonValue connectionValue = connections[i];
+        QString rowStr = connectionValue.toVariant().toString();
+        qDebug() << "    - Connection" << i << ":" << connectionValue.toVariant() << "as string:" << rowStr;
+        
+        if (i > 0) {
+            rowNumbersStr += ", ";
+        }
+        rowNumbersStr += rowStr;
+    }
+    
+    QString suggestionText;
+    if (!componentValue.isEmpty()) {
+        suggestionText = QString("You should add %1 %2 at these rows: %3")
+            .arg(componentValue)
+            .arg(componentName)
+            .arg(rowNumbersStr);
+    } else {
+        suggestionText = QString("You should add %1 at these rows: %2")
+            .arg(componentName)
+            .arg(rowNumbersStr);
+    }
+    
+    qDebug() << "  - Final suggestion text:" << suggestionText;
+    
+    QLabel *suggestionLabel = new QLabel(suggestionText);
+    suggestionLabel->setStyleSheet("QLabel { font-family: 'Droid Sans'; font-size: 11px; color: #333; background-color: #f0f0f0; padding: 8px; border: 1px solid #ccc; border-radius: 3px; }");
+    suggestionLabel->setWordWrap(true);
+    suggestionLabel->setAlignment(Qt::AlignCenter);
+    testLayout->addWidget(suggestionLabel);
+    
+    // Button area (bottom section) - consistent with other tests
+    QHBoxLayout *buttonLayout = new QHBoxLayout();
+    buttonLayout->setSpacing(10);
+    
+    // Blink button - consistent with other tests
+    QPushButton *blinkButton = new QPushButton("Blink", testWidget);
+    blinkButton->setStyleSheet("QPushButton { padding: 6px 12px; background: #f23926; color: white; border: none; border-radius: 3px; font-family: 'Droid Sans'; font-size: 10px; } QPushButton:hover { background: #d32f2f; } QPushButton:pressed { background: #b71c1c; }");
+    blinkButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    
+    // Connect blink button
+    connect(blinkButton, &QPushButton::clicked, [this, test]() {
+        qDebug() << "🔘 Blink button clicked for new component suggestion test:" << test["title"].toString();
+        emit blinkRequested(test, "blink");
+    });
+    
+    // Successfully Added button - toggleable completion button
+    QPushButton *successButton = new QPushButton("Successfully Added", testWidget);
+    successButton->setCheckable(true); // Make it toggleable
+    successButton->setStyleSheet("QPushButton { padding: 6px 12px; background: #ececec; color: #323232; border: 1px solid #b1b1b1; border-radius: 3px; font-family: 'Droid Sans'; font-size: 10px; } QPushButton:checked { background: #4CAF50; color: white; } QPushButton:hover { background: #666666; color: #ffffff; }");
+    successButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    
+    // Connect success button to update m_testGroups directly (same pattern as switch_connection_suggestion)
+    connect(successButton, &QPushButton::clicked, [this, test, successButton]() {
+        bool checked = successButton->isChecked();
+        QString status = checked ? "completed" : "incomplete";
+        
+        qDebug() << "🔧 Success button clicked for test:" << test["id"].toString();
+        qDebug() << "🔧 Button checked state:" << checked;
+        qDebug() << "🔧 Setting status to:" << status;
+        
+        // Find and update the test in the test groups (same logic as switch_connection_suggestion)
+        for (int groupIndex = 0; groupIndex < m_testGroups.size(); ++groupIndex) {
+            QJsonObject group = m_testGroups[groupIndex].toObject();
+            QJsonArray tests = group["tests"].toArray();
+            bool testFound = false;
+            
+            qDebug() << "🔍 Checking group" << groupIndex << "with" << tests.size() << "tests";
+            
+            for (int testIndex = 0; testIndex < tests.size(); ++testIndex) {
+                QJsonObject testObj = tests[testIndex].toObject();
+                if (testObj["id"].toString() == test["id"].toString()) {
+                    qDebug() << "🔧 Found test at group" << groupIndex << "test" << testIndex;
+                    qDebug() << "🔧 Old userObservation:" << testObj["userObservation"].toString();
+                    qDebug() << "🔧 Test ID:" << testObj["id"].toString();
+                    
+                    // Create a new test object with updated userObservation
+                    QJsonObject updatedTestObj = testObj;
+                    updatedTestObj["userObservation"] = status;
+                    
+                    qDebug() << "🔧 Updated test object userObservation:" << updatedTestObj["userObservation"].toString();
+                    
+                    // Replace the test in the array
+                    tests.removeAt(testIndex);
+                    tests.insert(testIndex, updatedTestObj);
+                    
+                    qDebug() << "🔧 After replace - tests array size:" << tests.size();
+                    
+                    // Update the group
+                    group["tests"] = tests;
+                    m_testGroups[groupIndex] = group;
+                    
+                    qDebug() << "🔧 Updated m_testGroups for group" << groupIndex;
+                    testFound = true;
+                    break;
+                }
+            }
+            if (testFound) break;
+        }
+    });
+    
+    buttonLayout->addWidget(blinkButton);
+    buttonLayout->addWidget(successButton);
+    buttonLayout->addStretch(); // Push buttons to the left
+    
+    testLayout->addLayout(buttonLayout);
+    
+    // Add test widget to parent layout
+    parentLayout->addWidget(testWidget);
+    
+    qDebug() << "✅ New component suggestion test displayed in TestWidget:" << test["title"].toString();
 }
 
 void TestWidget::handleVoltageDataReceived(const QJsonObject &voltageData)
