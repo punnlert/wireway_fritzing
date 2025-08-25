@@ -42,6 +42,7 @@ public:
 	~Platform() = default;
 
 	virtual void upload(QWidget *source, const QString &port, const QString &board, const QString &fileLocation);
+	virtual void compile(QWidget *source, const QString &board, const QString &fileLocation);
 	Syntaxer *getSyntaxer() const noexcept { return m_syntaxer; }
 
 	QString getName() const noexcept { return m_name; }

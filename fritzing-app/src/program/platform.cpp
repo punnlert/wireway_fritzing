@@ -48,6 +48,11 @@ void Platform::upload(QWidget * source, const QString &port, const QString &boar
 	// stub
 }
 
+void Platform::compile(QWidget * source, const QString &board, const QString &fileLocation)
+{
+	// stub
+}
+
 void Platform::initSyntaxer()
 {
 	QDir dir(FolderUtils::getApplicationSubFolderPath("translations"));

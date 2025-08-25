@@ -297,6 +297,10 @@ void MainWindow::initDock() {
   connect(this, &MainWindow::breadboardComponentAddedToContext,
           m_blinkboardWidget, &BlinkBoardWidget::addComponentToContextOnly);
 
+  // Connect circuit change signals to BlinkBoardWidget for automatic schematic updates
+  // Note: These signals need to be connected to the sketch widgets when they're created
+  // For now, we'll add a comment indicating where to add the connections
+
   // DebugDialog::debug("after creating bins");
   if (m_fileProgressDialog) {
     m_fileProgressDialog->setValue(89);

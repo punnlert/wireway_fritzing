@@ -112,6 +112,7 @@ public slots:
 	void rename();
 	void serialMonitor();
 	void sendProgram();
+	void reenableProgramButton();
 	void programProcessFinished(int exitCode, QProcess::ExitStatus exitStatus);
 	void programProcessReadyRead();
 	void updateMenu();

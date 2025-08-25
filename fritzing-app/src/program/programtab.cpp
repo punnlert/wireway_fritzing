@@ -748,6 +748,12 @@ void ProgramTab::sendProgram() {
 	                   m_filename);
 }
 
+void ProgramTab::reenableProgramButton() {
+	if (m_programButton) {
+		m_programButton->setEnabled(true);
+	}
+}
+
 void ProgramTab::programProcessFinished(int exitCode, QProcess::ExitStatus exitStatus) {
 	DebugDialog::debug(QString("program process finished %1 %2").arg(exitCode).arg(exitStatus));
 	m_programButton->setEnabled(true);

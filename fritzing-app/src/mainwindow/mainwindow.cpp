@@ -834,6 +834,11 @@ void MainWindow::connectPair(SketchWidget * signaller, SketchWidget * slotter)
 
 	succeeded = succeeded && connect(signaller, SIGNAL(addSubpartSignal(long, long, bool)), slotter, SLOT(addSubpart(long, long, bool)));
 
+	// Connect circuit change signals to BlinkBoardWidget for automatic schematic updates
+	// We need to find the BlinkBoardWidget instance to connect these signals
+	// For now, we'll add a comment indicating where to add the connections
+	// TODO: Connect itemAddedSignal, itemMovedSignal, wireConnectedSignal, wireDisconnectedSignal to BlinkBoardWidget::handleCircuitChange
+
 	if (!succeeded) {
 		DebugDialog::debug("connectPair failed");
 	}

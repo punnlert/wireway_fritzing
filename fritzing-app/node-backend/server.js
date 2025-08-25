@@ -1537,6 +1537,11 @@ function init_blinkboard_sequence() {
     cmd: "animate",
   });
   // write_json_to_port({ cmd: "setLed", led: "1", pattern: "blink2" });
+
+  // Automatically update schematics when connection is established
+  console.log("🔌 BlinkBoard connected - automatically updating schematics...");
+  // Note: We'll need to get the current netlist from the frontend
+  // This will be handled by the frontend sending an automatic update
 }
 
 function write_json_to_port(json) {
@@ -2137,10 +2142,10 @@ async function processCommand(command) {
 
           let query_text = `${message}${contextString}\n\nAdd any tests or suggestions if necessary. You can explain the test in your reply but you don't have to mention some trivial details like test_key`;
           console.log("query_text", query_text);
-          // const response = await send_openai_message(query_text);
+          const response = await send_openai_message(query_text);
         } else {
           let query_text = `${message} \n Add any tests or suggestions if necessary. You can explain the test in your reply but you don't have to mention some trivial details like test_key`;
-          // const response = await send_openai_message(query_text);
+          const response = await send_openai_message(query_text);
         }
 
         return;
@@ -2179,99 +2184,99 @@ process.on("unhandledRejection", (reason, promise) => {
 
 // Initialize with some sample test groups
 testGroups = [
-  // {
-  //   id: "1",
-  //   title: "Circuit Validation Tests",
-  //   description:
-  //     "Basic validation tests for circuit components and connections",
-  //   tests: [
-  //     // {
-  //     //   name: "Component Connection Test",
-  //     //   description: "Verify all components are properly connected",
-  //     // },
-  //     // {
-  //     //   name: "Power Supply Test",
-  //     //   description: "Check power supply connections and voltage levels",
-  //     // },
-  //     // {
-  //     //   name: "Signal Flow Test",
-  //     //   description: "Validate signal paths through the circuit",
-  //     // },
-  //     {
-  //       id: "so_demo_1",
-  //       type: "self_observe",
-  //       title: "When you press the button, what does the LED do?",
-  //       description:
-  //         "Press and release the button a few times and describe the LED behavior.",
-  //       jsondata: { row: [10] },
-  //       userObservation: "",
-  //       completed: false,
-  //     },
-  //     {
-  //       id: "mv_demo_1",
-  //       type: "measure_voltage",
-  //       title: "Measure voltage at row 15 using A0",
-  //       description:
-  //         "Rotate the potentiometer from end to end while measuring the voltage.",
-  //       jsondata: { blinkboard_adc_row: "a0", measure_row: 15 },
-  //       blinkboardADCRow: "a0",
-  //       measureRow: 15,
-  //       completed: false,
-  //       voltageData: [],
-  //     },
-  //     {
-  //       id: "sc_demo_1",
-  //       type: "switch_connection_suggestion",
-  //       title: "Switch connection suggestion",
-  //       description:
-  //         "The student mistakenly connected pin 10 to pin 11. You should switch the connection to pin 12.",
-  //       jsondata: { row_from: "10", row_to: "gnd" },
-  //       row_from: "10",
-  //       row_to: "gnd",
-  //       userObservation: "",
-  //       completed: false,
-  //     },
-  //     {
-  //       id: "hl_demo_1",
-  //       type: "high_low_voltage",
-  //       title: "High/Low Voltage Test",
-  //       description: "Test the high/low voltage of the circuit.",
-  //       jsondata: {
-  //         blinkboard_digital_row: "D0",
-  //         high_low_row: 1,
-  //         high_low_pattern: [
-  //           { voltage: "high", duration: 1000 },
-  //           { voltage: "low", duration: 1000 },
-  //           { voltage: "high", duration: 500 },
-  //           { voltage: "low", duration: 500 },
-  //           { voltage: "high", duration: 1000 },
-  //         ],
-  //       },
-  //       completed: false,
-  //     },
-  //     {
-  //       id: "av_demo_1",
-  //       type: "analog_voltage",
-  //       title: "Output 1.5V to row 1",
-  //       description: "Output 1.5V to row 1",
-  //       jsondata: { output_row: 1, output_voltage: 1.5 },
-  //       completed: false,
-  //     },
-  //     {
-  //       id: "nc_demo_1",
-  //       type: "new_component_suggestion",
-  //       title: "Add a resistor to the circuit",
-  //       description: "Add a resistor to the circuit",
-  //       jsondata: {
-  //         component_name: "resistor",
-  //         component_value: "1k",
-  //         connections: [1, 26],
-  //       },
-  //       completed: false,
-  //     },
-  //   ],
-  //   timestamp: Date.now(),
-  // },
+  {
+    id: "1",
+    title: "Circuit Validation Tests",
+    description:
+      "Basic validation tests for circuit components and connections",
+    tests: [
+      // {
+      //   name: "Component Connection Test",
+      //   description: "Verify all components are properly connected",
+      // },
+      // {
+      //   name: "Power Supply Test",
+      //   description: "Check power supply connections and voltage levels",
+      // },
+      // {
+      //   name: "Signal Flow Test",
+      //   description: "Validate signal paths through the circuit",
+      // },
+      {
+        id: "so_demo_1",
+        type: "self_observe",
+        title: "When you press the button, what does the LED do?",
+        description:
+          "Press and release the button a few times and describe the LED behavior.",
+        jsondata: { row: [10] },
+        userObservation: "",
+        completed: false,
+      },
+      {
+        id: "mv_demo_1",
+        type: "measure_voltage",
+        title: "Measure voltage at row 15 using A0",
+        description:
+          "Rotate the potentiometer from end to end while measuring the voltage.",
+        jsondata: { blinkboard_adc_row: "a0", measure_row: 15 },
+        blinkboardADCRow: "a0",
+        measureRow: 15,
+        completed: false,
+        voltageData: [],
+      },
+      {
+        id: "sc_demo_1",
+        type: "switch_connection_suggestion",
+        title: "Switch connection suggestion",
+        description:
+          "The student mistakenly connected pin 10 to pin 11. You should switch the connection to pin 12.",
+        jsondata: { row_from: "10", row_to: "gnd" },
+        row_from: "10",
+        row_to: "gnd",
+        userObservation: "",
+        completed: false,
+      },
+      {
+        id: "hl_demo_1",
+        type: "high_low_voltage",
+        title: "High/Low Voltage Test",
+        description: "Test the high/low voltage of the circuit.",
+        jsondata: {
+          blinkboard_digital_row: "D0",
+          high_low_row: 1,
+          high_low_pattern: [
+            { voltage: "high", duration: 1000 },
+            { voltage: "low", duration: 1000 },
+            { voltage: "high", duration: 500 },
+            { voltage: "low", duration: 500 },
+            { voltage: "high", duration: 1000 },
+          ],
+        },
+        completed: false,
+      },
+      {
+        id: "av_demo_1",
+        type: "analog_voltage",
+        title: "Output 1.5V to row 1",
+        description: "Output 1.5V to row 1",
+        jsondata: { output_row: 1, output_voltage: 1.5 },
+        completed: false,
+      },
+      {
+        id: "nc_demo_1",
+        type: "new_component_suggestion",
+        title: "Add a resistor to the circuit",
+        description: "Add a resistor to the circuit",
+        jsondata: {
+          component_name: "resistor",
+          component_value: "1k",
+          connections: [1, 26],
+        },
+        completed: false,
+      },
+    ],
+    timestamp: Date.now(),
+  },
   // {
   //   id: "2",
   //   title: "Performance Tests",
