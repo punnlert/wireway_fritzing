@@ -635,6 +635,8 @@ void ProgramWindow::saveAll() {
 
 void ProgramWindow::saveCurrentTab() {
 	tabSave(m_tabWidget->currentIndex());
+	// Also emit current code to backend even if nothing changed
+	sendCurrentCodeToBackend();
 }
 
 void ProgramWindow::tabSave(int index) {
@@ -649,6 +651,8 @@ void ProgramWindow::tabSaveAs(int index) {
 	if (programTab == NULL) return;
 
 	prepSave(programTab, true);
+	// Also emit current code to backend
+	sendCurrentCodeToBackend();
 }
 
 void ProgramWindow::tabRename(int index) {
@@ -692,6 +696,10 @@ bool ProgramWindow::prepSave(ProgramTab * programTab, bool saveAsFlag)
 	if (result) {
 		programTab->setClean();
 		emit linkToProgramFile(programTab->filename(), programTab->platform(), true, true);
+		
+		// Emit signal to notify that code has been saved
+		QString platformName = programTab->platform() ? programTab->platform()->getName() : "Unknown";
+		emit codeSaved(programTab->text(), programTab->filename(), platformName);
 	}
 	return result;
 }
@@ -806,6 +814,13 @@ void ProgramWindow::serialMonitor() {
 
 void ProgramWindow::sendProgram() {
 	currentWidget()->sendProgram();
+}
+
+void ProgramWindow::sendCurrentCodeToBackend() {
+	ProgramTab * pt = currentWidget();
+	if (!pt) return;
+	QString platformName = pt->platform() ? pt->platform()->getName() : "Unknown";
+	emit codeSaved(pt->text(), pt->filename(), platformName);
 }
 
 ProgramTab * ProgramWindow::currentWidget() {

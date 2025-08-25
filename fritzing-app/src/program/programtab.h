@@ -88,6 +88,9 @@ public:
 	void setPlatform(Platform * newPlatform, bool updateLink);
 	void appendToConsole(const QString &);
 	void initMenus();
+	
+	// New method to manually send code to backend
+	void sendCurrentCodeToBackend();
 public slots:
 	void setPlatform(const QString & newPlatformName);
 	void setPlatform(Platform * newPlatform);
@@ -130,6 +133,9 @@ signals:
 	void programWindowUpdateRequest(bool programEnable, bool undoEnable, bool redoEnable,
 	                                bool cutEnable, bool copyEnable, bool pasteEnable, Platform * platform,
 	                                const QString & port, const QString & board, const QString & filename);
+	
+	// New signal to notify when code is saved
+	void codeSaved(const QString& code, const QString& filename, const QString& platform);
 
 protected:
 	QFrame * createFooter();

@@ -45,6 +45,8 @@ let openai_chat_history = [];
 let schematics;
 let schematic_file_change = false;
 let testGroups = []; // Store test groups for the test window
+let code_file;
+let code_file_change = false;
 
 let openai_chat_context = [];
 
@@ -496,7 +498,7 @@ const schematics_functions = [
         component_name: { type: "string" },
         pattern: {
           type: "string",
-          enum: ["blink", "blink2", "on", "off"],
+          enum: ["blink", "blink2", "on"],
         },
       },
       required: ["info", "rows", "component_name", "pattern"],
@@ -887,11 +889,20 @@ function add_component_highlight_chat({ rows, component_name, pattern, info }) {
 }
 
 function request_schematics() {
-  return {
-    status: "success",
-    message: schematics.schematics_yaml,
-    timestamp: Date.now(),
-  };
+  if (schematics.schematics_yaml) {
+    return {
+      status: "success",
+      message: schematics.schematics_yaml,
+      timestamp: Date.now(),
+    };
+  } else {
+    return {
+      status: "error",
+      message:
+        "No schematics found. you should provoke the user to update the schematics to backend.",
+      timestamp: Date.now(),
+    };
+  }
 }
 
 function add_test_group({ title, description }) {
@@ -1554,13 +1565,13 @@ async function send_openai_message(message) {
   if (mode_changed) {
     openai_chat_history.push({
       role: "developer",
-      content: `the operation mode has been changed to ${global_mode}`,
+      content: `the operation mode has been changed to <operation_mode> \n ${global_mode} \n </operation_mode>`,
     });
     mode_changed = false;
   }
 
   if (schematic_file_change) {
-    const update_schematics = `this is the .yaml representation of the schematics \n ${schematics.schematics_yaml} \n `;
+    const update_schematics = `this is the .yaml representation of the schematics \n <schematics_yaml> \n ${schematics.schematics_yaml} \n </schematics_yaml> \n `;
 
     openai_chat_history.push({
       role: "developer",
@@ -1570,6 +1581,14 @@ async function send_openai_message(message) {
     // console.log("update_schematics", update_schematics);
 
     schematic_file_change = false;
+  }
+
+  if (code_file_change) {
+    openai_chat_history.push({
+      role: "developer",
+      content: `this is the recent code file that the user has saved. <arduino_code> \n ${code_file} \n </arduino_code>`,
+    });
+    code_file_change = false;
   }
 
   openai_chat_history.push({
@@ -1800,9 +1819,15 @@ async function processCommand(command) {
           if (blinkboard_digital_row) {
             blink_command_pin(blinkboard_digital_row.toLowerCase(), "blink");
           }
+        } else if (test.type === "new_component_suggestion") {
+          const { connections } = test.jsondata;
+          rows = [...rows, ...connections];
+          blink_rows(connections, "on");
         } else if (test.type === "component_highlight") {
-          const { rows, pattern } = test.jsondata;
-          blink_rows(rows, pattern);
+          const blinking_rows = test.jsondata?.rows || [];
+          const pattern = test.jsondata?.pattern || "blink";
+          rows = [...rows, ...blinking_rows];
+          blink_rows(blinking_rows, pattern);
         }
 
         setTimeout(() => {
@@ -1967,6 +1992,23 @@ async function processCommand(command) {
           415
         );
       }
+
+    case "code_saved":
+      const { code, filename, platform } = command;
+      console.log(`💾 Code saved: ${filename}`);
+      console.log(`Platform: ${platform}`);
+      console.log(`Code: ${code}`);
+
+      if (code_file !== code) {
+        code_file = code;
+        code_file_change = true;
+      }
+
+      return {
+        status: "success",
+        message: "Code saved",
+        timestamp: Date.now(),
+      };
 
     case "chat":
       try {

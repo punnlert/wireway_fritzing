@@ -255,6 +255,12 @@ public:
                                    int initialTab);
   static void setAutosavePeriod(int);
   static void setAutosaveEnabled(bool);
+  
+  // Helper method to connect ProgramWindow signals to BlinkBoardWidget
+  void connectProgramWindowToBlinkBoard();
+  
+  // Method to manually send current code to backend
+  void sendCurrentCodeToBackend();
 
 signals:
   void alienPartsDismissed();
@@ -265,6 +271,7 @@ signals:
   void multipleBreadboardComponentsSelected(const QJsonArray& componentsData);
   void breadboardComponentDeselected(const QString& componentId);
   void breadboardComponentAddedToContext(const QJsonObject& componentData);
+  void codeSaved(const QString& code, const QString& filename, const QString& platform);
 
 public slots:
   void ensureClosable();
@@ -297,6 +304,9 @@ public slots:
   void handleMultipleBreadboardComponentsSelected(const QJsonArray& componentsData);
   void handleBreadboardComponentDeselected(const QString& componentId);
   void handleBreadboardComponentAddedToContext(const QJsonObject& componentData);
+  
+  // Slot to handle code saved events from ProgramTab
+  void handleCodeSaved(const QString& code, const QString& filename, const QString& platform);
 
 protected slots:
   void mainLoad();

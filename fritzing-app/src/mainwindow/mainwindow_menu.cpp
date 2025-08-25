@@ -4094,11 +4094,25 @@ void MainWindow::openProgramWindow() {
 	        this, SLOT(linkToProgramFile(const QString &, Platform *, bool, bool)));
 	connect(m_programWindow, SIGNAL(changeActivationSignal(bool, QWidget *)), qApp, SLOT(changeActivation(bool, QWidget *)), Qt::DirectConnection);
 	connect(m_programWindow, SIGNAL(destroyed(QObject *)), qApp, SLOT(topLevelWidgetDestroyed(QObject *)));
-
+	
 	QFileInfo fileInfo(m_fwFilename);
 	m_programWindow->setup();
 	m_programWindow->linkFiles(m_linkedProgramFiles, fileInfo.absoluteDir().absolutePath());
 	m_programWindow->setVisible(true);
+	
+	// Connect ProgramWindow signals to BlinkBoardWidget
+	connectProgramWindowToBlinkBoard();
+}
+
+void MainWindow::connectProgramWindowToBlinkBoard() {
+	if (m_programWindow && m_blinkboardWidget) {
+		connect(m_programWindow, SIGNAL(codeSaved(const QString&, const QString&, const QString&)),
+		        m_blinkboardWidget, SLOT(sendCodeToBackend(const QString&, const QString&, const QString&)));
+		
+		// Also connect to MainWindow's handleCodeSaved slot to forward the signal
+		connect(m_programWindow, SIGNAL(codeSaved(const QString&, const QString&, const QString&)),
+		        this, SLOT(handleCodeSaved(const QString&, const QString&, const QString&)));
+	}
 }
 
 void MainWindow::linkToProgramFile(const QString & filename, Platform * platform, bool addLink, bool strong) {
@@ -4506,4 +4520,21 @@ void MainWindow::testConnectors() {
 	if (m_currentGraphicsView == NULL) return;
 
 	m_currentGraphicsView->testConnectors();
+}
+
+void MainWindow::handleCodeSaved(const QString& code, const QString& filename, const QString& platform) {
+	// Forward the code saved event to the MainWindow signal
+	emit codeSaved(code, filename, platform);
+}
+
+void MainWindow::sendCurrentCodeToBackend() {
+	// Send current code from the active program tab to the backend
+	if (m_programWindow) {
+		m_programWindow->sendCurrentCodeToBackend();
+	}
+	
+	// Also check m_programView if it exists
+	if (m_programView) {
+		m_programView->sendCurrentCodeToBackend();
+	}
 }

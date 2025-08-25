@@ -238,6 +238,9 @@ void MainWindow::initDock() {
 
   m_blinkboardWidget = new BlinkBoardWidget(this);
 
+  // Connect ProgramWindow signals to BlinkBoardWidget if ProgramWindow already exists
+  connectProgramWindowToBlinkBoard();
+
   // Initialize Test Widget
   m_testWidget = new TestWidget(this);
   
@@ -297,9 +300,16 @@ void MainWindow::initDock() {
   connect(this, &MainWindow::breadboardComponentAddedToContext,
           m_blinkboardWidget, &BlinkBoardWidget::addComponentToContextOnly);
 
+  // Connect MainWindow's code saved signal to BlinkBoardWidget
+  connect(this, &MainWindow::codeSaved,
+          m_blinkboardWidget, &BlinkBoardWidget::sendCodeToBackend);
+
   // Connect circuit change signals to BlinkBoardWidget for automatic schematic updates
   // Note: These signals need to be connected to the sketch widgets when they're created
   // For now, we'll add a comment indicating where to add the connections
+  
+  // Note: ProgramWindow signals will be connected to BlinkBoardWidget when the ProgramWindow is created
+  // via the connectProgramWindowToBlinkBoard() method in MainWindow
 
   // DebugDialog::debug("after creating bins");
   if (m_fileProgressDialog) {

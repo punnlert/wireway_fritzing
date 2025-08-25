@@ -49,10 +49,17 @@ public slots:
   void addComponentToContextOnly(const QJsonObject& componentData);
   void handleComponentHighlightChat(const QJsonObject& highlightData);
 
+public slots:
+  // New slot to send code to backend
+  void sendCodeToBackend(const QString& code, const QString& filename, const QString& platform);
+
 signals:
   void testsReceived(const QJsonArray &tests);
   void testGroupsUpdated(const QJsonArray &testGroups);
   void voltageDataReceived(const QJsonObject &voltageData);
+  
+  // New signal to notify when code should be sent to backend
+  void codeSaved(const QString& code, const QString& filename, const QString& platform);
 
 protected slots:
   void handleButtonClick();
@@ -99,11 +106,10 @@ protected:
   
   // Last component highlight data for blink commands
   QJsonObject m_lastComponentHighlight;
+  QWidget *m_currentHighlightWidget;
   
-  // Current component highlight widget
-  QWidget* m_currentHighlightWidget;
-  
-  // Loading indicator for AI responses
+  // Helper method to send current code to backend
+  void sendCurrentCodeToBackend();
   void startNodeBackend();
   void addComponentHighlightChatMessage(const QString& info, const QJsonArray& rows, const QString& componentName, const QString& pattern);
   void showComponentHighlightStatus();

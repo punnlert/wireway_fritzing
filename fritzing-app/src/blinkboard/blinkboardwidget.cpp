@@ -241,7 +241,7 @@ BlinkBoardWidget::BlinkBoardWidget(QWidget *parent)
   this->setMinimumWidth(500); // Set minimum width for the entire widget
 
   // Add welcome message
-  addChatMessage("Welcome to BlinkBoard Chat! Connect to the Node.js backend to start chatting.", false);
+  // addChatMessage("Welcome to BlinkBoard Chat! Connect to the Node.js backend to start chatting.", false);
 }
 
 void BlinkBoardWidget::updateContent() {
@@ -511,7 +511,7 @@ void BlinkBoardWidget::handleSendMessage() {
     handleBlinkRequest(test, "blink");
     
     // Add confirmation message to chat
-    addChatMessage(QString("🔘 Blinking %1...").arg(componentName), false);
+    // addChatMessage(QString("🔘 Blinking %1...").arg(componentName), false);
     
     // Clear the input field
     m_messageInput->clear();
@@ -540,7 +540,7 @@ void BlinkBoardWidget::handleSendMessage() {
     handleBlinkRequest(test, "blink");
     
     // Add confirmation message to chat
-    addChatMessage(QString("🔘 Highlighting %1...").arg(componentName), false);
+    // addChatMessage(QString("🔘 Highlighting %1...").arg(componentName), false);
     
     // Clear the input field
     m_messageInput->clear();
@@ -651,6 +651,9 @@ void BlinkBoardWidget::handleUpdateSchematics() {
   
   qDebug() << "Sending netlist to Node.js:" << jsonString.left(200) + "...";
   m_nodeProcess->write(jsonString.toUtf8() + "\n");
+  
+  // Also send the current code to provide context for the schematic update
+  sendCurrentCodeToBackend();
 }
 
 // Helper function to find the main window from a widget
@@ -905,7 +908,7 @@ void BlinkBoardWidget::handleBlinkBoardConnectionRequest() {
   qDebug() << "🔌 BlinkBoard connection requested from TestWidget";
   
   // Add a chat message about the connection request
-  addChatMessage("BlinkBoard connection requested from Test Widget", false);
+  // addChatMessage("BlinkBoard connection requested from Test Widget", false);
   
   if (m_nodeProcess->state() == QProcess::Running) {
     if (m_serialPorts.isEmpty()) {
@@ -1015,6 +1018,60 @@ void BlinkBoardWidget::handleBlinkRequest(const QJsonObject &test, const QString
   addChatMessage("Blink command sent to backend.", false);
 }
 
+/**
+ * Sends the current code content to the Node.js backend for analysis.
+ * This method is called automatically whenever a program file is saved in Fritzing.
+ * 
+ * @param code The current code content from the program tab
+ * @param filename The filename of the saved program
+ * @param platform The platform name (e.g., "Arduino", "Picaxe")
+ */
+void BlinkBoardWidget::sendCodeToBackend(const QString& code, const QString& filename, const QString& platform)
+{
+  if (m_nodeProcess->state() != QProcess::Running) {
+    addChatMessage("Not connected to backend. Cannot send code.", false);
+    return;
+  }
+
+  // Create command to send code to backend
+  QJsonObject jsonCommand;
+  jsonCommand["command"] = "code_saved";
+  jsonCommand["code"] = code;
+  jsonCommand["filename"] = filename;
+  jsonCommand["platform"] = platform;
+  jsonCommand["timestamp"] = QDateTime::currentMSecsSinceEpoch();
+  
+  QJsonDocument doc(jsonCommand);
+  QString jsonString = doc.toJson(QJsonDocument::Compact);
+  
+  qDebug() << "💾 Sending code to Node.js backend:" << jsonString.left(200) + "...";
+  m_nodeProcess->write(jsonString.toUtf8() + "\n");
+  
+  // addChatMessage("Code sent to backend for analysis.", false);
+}
+
+void BlinkBoardWidget::sendCurrentCodeToBackend() {
+  if (m_nodeProcess->state() != QProcess::Running) {
+    return; // Silently return if backend not connected
+  }
+
+  // Try to find the current program tab through the parent MainWindow
+  QWidget *parent = this->parentWidget();
+  while (parent && !parent->inherits("MainWindow")) {
+    parent = parent->parentWidget();
+  }
+  
+  if (!parent) {
+    return; // Couldn't find MainWindow
+  }
+  
+  // Cast to MainWindow and call its sendCurrentCodeToBackend method
+  MainWindow *mainWindow = qobject_cast<MainWindow*>(parent);
+  if (mainWindow) {
+    mainWindow->sendCurrentCodeToBackend();
+  }
+}
+
 void BlinkBoardWidget::handleHighLowVoltageRequest(const QJsonObject &voltageCommand)
 {
   if (m_nodeProcess->state() != QProcess::Running) {
@@ -1035,7 +1092,7 @@ void BlinkBoardWidget::handleHighLowVoltageRequest(const QJsonObject &voltageCom
   qDebug() << "🔌 Sending high/low voltage request to Node.js backend:" << jsonString.left(200) + "...";
   m_nodeProcess->write(jsonString.toUtf8() + "\n");
   
-  addChatMessage("Voltage command sent to backend.", false);
+  // addChatMessage("Voltage command sent to backend.", false);
 }
 
 void BlinkBoardWidget::handleMeasureRequest(const QJsonObject &test)
@@ -1057,7 +1114,7 @@ void BlinkBoardWidget::handleMeasureRequest(const QJsonObject &test)
   qDebug() << "📊 Sending measure request to Node.js backend:" << jsonString.left(200) + "...";
   m_nodeProcess->write(jsonString.toUtf8() + "\n");
   
-  addChatMessage("Measure command sent to backend. Collecting voltage data...", false);
+  // addChatMessage("Measure command sent to backend. Collecting voltage data...", false);
 }
 
 void BlinkBoardWidget::handleVoltageOutputRequest(const QJsonObject &test)
@@ -1085,7 +1142,7 @@ void BlinkBoardWidget::handleVoltageOutputRequest(const QJsonObject &test)
   qDebug() << "⚡ Sending voltage output request to Node.js backend:" << jsonString.left(200) + "...";
   m_nodeProcess->write(jsonString.toUtf8() + "\n");
   
-  addChatMessage(QString("Voltage output request sent: %1V to row %2").arg(outputVoltage, 0, 'f', 1).arg(outputRow), false);
+  // addChatMessage(QString("Voltage output request sent: %1V to row %2").arg(outputVoltage, 0, 'f', 1).arg(outputRow), false);
 }
 
 void BlinkBoardWidget::sendComponentHighlightToBackend(const QJsonObject& componentData)
@@ -1109,7 +1166,7 @@ void BlinkBoardWidget::sendComponentHighlightToBackend(const QJsonObject& compon
   qDebug() << "🔘 Sending component highlight to Node.js backend:" << jsonString.left(200) + "...";
   m_nodeProcess->write(jsonString.toUtf8() + "\n");
   
-  addChatMessage("Component highlight command sent to backend.", false);
+  // addChatMessage("Component highlight command sent to backend.", false);
 }
 
 void BlinkBoardWidget::addComponentToContextOnly(const QJsonObject& componentData)
@@ -1127,7 +1184,7 @@ void BlinkBoardWidget::addComponentToContextOnly(const QJsonObject& componentDat
   QString title = componentData["component_title"].toString();
   if (title.isEmpty()) title = componentData["component_id"].toString();
   
-  addChatMessage(QString("Added '%1' to context (double-click)").arg(title), false);
+  // addChatMessage(QString("Added '%1' to context (double-click)").arg(title), false);
 }
 
 void BlinkBoardWidget::handleAnalogReadData(const QJsonObject &event)
@@ -1366,7 +1423,7 @@ void BlinkBoardWidget::addComponentHighlightChatMessage(const QString& info, con
     handleBlinkRequest(test, "blink");
     
     // Add confirmation message to chat
-    addChatMessage(QString("🔘 Blinking %1...").arg(componentName), false);
+    // addChatMessage(QString("🔘 Blinking %1...").arg(componentName), false);
   });
   
   // Add timestamp
@@ -1379,7 +1436,7 @@ void BlinkBoardWidget::addComponentHighlightChatMessage(const QString& info, con
   m_currentHighlightWidget = highlightWidget;
   
   // Add a separator message to the chat
-  addChatMessage("🔘 Component Highlight received", false);
+  // addChatMessage("🔘 Component Highlight received", false);
   
   // Add the highlight widget to the main layout after the chat display
   // We'll insert it after the chat display but before the input area
@@ -1401,14 +1458,14 @@ void BlinkBoardWidget::addComponentHighlightChatMessage(const QString& info, con
 
 void BlinkBoardWidget::showComponentHighlightStatus() {
   if (m_lastComponentHighlight.isEmpty()) {
-    addChatMessage("ℹ️ No component is currently highlighted", false);
+    // addChatMessage("ℹ️ No component is currently highlighted", false);
     return;
   }
   
   QString componentName = m_lastComponentHighlight["component_name"].toString();
   QString info = m_lastComponentHighlight["info"].toString();
   
-  addChatMessage(QString("🔘 Currently highlighted: %1").arg(componentName), false);
-  addChatMessage(QString("📋 %1").arg(info), false);
-  addChatMessage("💡 Type 'blink' to highlight this component on the board", false);
+  // addChatMessage(QString("🔘 Currently highlighted: %1").arg(componentName), false);
+  // addChatMessage(QString("📋 %1").arg(info), false);
+  // addChatMessage("💡 Type 'blink' to highlight this component on the board", false);
 }

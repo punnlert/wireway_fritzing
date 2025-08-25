@@ -3088,6 +3088,10 @@ void MainWindow::initProgrammingWidget() {
 
 	connect(m_programView, SIGNAL(linkToProgramFile(const QString &, Platform *, bool, bool)),
 	        this, SLOT(linkToProgramFile(const QString &, Platform *, bool, bool)));
+	
+	// Connect code saved signal to MainWindow
+	connect(m_programView, SIGNAL(codeSaved(const QString&, const QString&, const QString&)),
+	        this, SLOT(handleCodeSaved(const QString&, const QString&, const QString&)));
 
 	m_programView->setup();
 

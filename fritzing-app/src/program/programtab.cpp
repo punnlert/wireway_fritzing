@@ -707,6 +707,10 @@ bool ProgramTab::save(const QString & filename) {
 	bool result = (b.length() == written);
 	if (result) {
 		setFilename(filename);
+		
+		// Emit signal to notify that code has been saved
+		QString platformName = m_platform ? m_platform->getName() : "Unknown";
+		emit codeSaved(m_textEdit->toPlainText(), filename, platformName);
 	}
 	return result;
 }
@@ -885,4 +889,10 @@ void ProgramTab::enableProgramButton() {
 void ProgramTab::appendToConsole(const QString & text)
 {
 	m_console->appendPlainText(text);
+}
+
+void ProgramTab::sendCurrentCodeToBackend() {
+	// Emit signal to notify that code should be sent to backend
+	QString platformName = m_platform ? m_platform->getName() : "Unknown";
+	emit codeSaved(m_textEdit->toPlainText(), m_filename, platformName);
 }

@@ -96,6 +96,9 @@ public:
 	void createViewMenuActions(QList<QAction *> &);
 	void print();
 
+	// Public helper to emit current code without exposing protected internals
+	void sendCurrentCodeToBackend();
+
 public slots:
 	void saveAll();
 
@@ -103,6 +106,9 @@ signals:
 	void closed();
 	void changeActivationSignal(bool activate, QWidget * originator);
 	void linkToProgramFile(const QString & filename, Platform * platform, bool addlink, bool strong);
+	
+	// New signal to notify when code is saved
+	void codeSaved(const QString& code, const QString& filename, const QString& platform);
 
 protected slots:
 	void loadProgramFile();
