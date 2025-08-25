@@ -47,6 +47,7 @@ public slots:
   void handleComponentDeselected(const QString& componentId);
   void sendComponentHighlightToBackend(const QJsonObject& componentData);
   void addComponentToContextOnly(const QJsonObject& componentData);
+  void handleComponentHighlightChat(const QJsonObject& highlightData);
 
 signals:
   void testsReceived(const QJsonArray &tests);
@@ -96,8 +97,16 @@ protected:
   QJsonArray m_highlightedComponents;
   QLabel *m_highlightedComponentsLabel;
   
+  // Last component highlight data for blink commands
+  QJsonObject m_lastComponentHighlight;
+  
+  // Current component highlight widget
+  QWidget* m_currentHighlightWidget;
+  
   // Loading indicator for AI responses
   void startNodeBackend();
+  void addComponentHighlightChatMessage(const QString& info, const QJsonArray& rows, const QString& componentName, const QString& pattern);
+  void showComponentHighlightStatus();
   void sendCommandToNode(const QString &command);
   void addChatMessage(const QString &message, bool isUser = true);
   void updateButtonColor(bool isConnected);

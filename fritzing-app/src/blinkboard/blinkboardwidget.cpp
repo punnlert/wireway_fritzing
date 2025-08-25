@@ -45,6 +45,10 @@ BlinkBoardWidget::BlinkBoardWidget(QWidget *parent)
       m_modeToggleButton(new QPushButton("Asking")),
       m_isAskingMode(true) {
 
+  // Initialize member variables
+  m_lastComponentHighlight = QJsonObject();
+  m_currentHighlightWidget = nullptr;
+  
   auto frame = new QFrame(this);
 
   m_mainLayout->setSizeConstraint(QLayout::SetMinAndMaxSize); // Remove size constraint
@@ -405,6 +409,10 @@ void BlinkBoardWidget::handleNodeProcessOutput() {
             handleMessageReceived(message);
           }
           continue;
+        } else if (type == "component_highlight_chat") {
+          qDebug() << "🔘 Component highlight chat from backend:" << response;
+          handleComponentHighlightChat(response);
+          continue;
         }
       }
       
@@ -478,6 +486,71 @@ void BlinkBoardWidget::handleNodeFinished(int exitCode, QProcess::ExitStatus exi
 void BlinkBoardWidget::handleSendMessage() {
   QString message = m_messageInput->text().trimmed();
   if (message.isEmpty()) {
+    return;
+  }
+  
+  // Check if this is a blink command for the last highlighted component
+  if (message.toLower() == "blink" && !m_lastComponentHighlight.isEmpty()) {
+    // Extract the component highlight data
+    QJsonArray rows = m_lastComponentHighlight["rows"].toArray();
+    QString componentName = m_lastComponentHighlight["component_name"].toString();
+    QString pattern = m_lastComponentHighlight["pattern"].toString();
+    
+    // Create a test object for the blink request
+    QJsonObject test;
+    test["type"] = "component_highlight";
+    test["title"] = QString("Blink %1").arg(componentName);
+    
+    QJsonObject jsondata;
+    jsondata["rows"] = rows;
+    jsondata["component_name"] = componentName;
+    jsondata["pattern"] = pattern;
+    test["jsondata"] = jsondata;
+    
+    // Send blink request to backend
+    handleBlinkRequest(test, "blink");
+    
+    // Add confirmation message to chat
+    addChatMessage(QString("🔘 Blinking %1...").arg(componentName), false);
+    
+    // Clear the input field
+    m_messageInput->clear();
+    return;
+  }
+  
+  // Check for other variations of blink commands
+  if ((message.toLower().startsWith("blink ") || message.toLower() == "highlight") && !m_lastComponentHighlight.isEmpty()) {
+    // Extract the component highlight data
+    QJsonArray rows = m_lastComponentHighlight["rows"].toArray();
+    QString componentName = m_lastComponentHighlight["component_name"].toString();
+    QString pattern = m_lastComponentHighlight["pattern"].toString();
+    
+    // Create a test object for the blink request
+    QJsonObject test;
+    test["type"] = "component_highlight";
+    test["title"] = QString("Blink %1").arg(componentName);
+    
+    QJsonObject jsondata;
+    jsondata["rows"] = rows;
+    jsondata["component_name"] = componentName;
+    jsondata["pattern"] = pattern;
+    test["jsondata"] = jsondata;
+    
+    // Send blink request to backend
+    handleBlinkRequest(test, "blink");
+    
+    // Add confirmation message to chat
+    addChatMessage(QString("🔘 Highlighting %1...").arg(componentName), false);
+    
+    // Clear the input field
+    m_messageInput->clear();
+    return;
+  }
+  
+  // Check for status command
+  if (message.toLower() == "status" || message.toLower() == "highlight status") {
+    showComponentHighlightStatus();
+    m_messageInput->clear();
     return;
   }
   
@@ -1218,4 +1291,124 @@ void BlinkBoardWidget::handleModeToggle() {
   }
   
   qDebug() << "Toggled mode to:" << modeText;
+}
+
+void BlinkBoardWidget::handleComponentHighlightChat(const QJsonObject& highlightData) {
+  qDebug() << "=== COMPONENT HIGHLIGHT CHAT RECEIVED ===";
+  qDebug() << "Highlight data:" << highlightData;
+  
+  // Extract the data from the highlight message
+  QString info = highlightData["info"].toString();
+  QJsonArray rows = highlightData["rows"].toArray();
+  QString componentName = highlightData["component_name"].toString();
+  QString pattern = highlightData["pattern"].toString();
+  
+  // Create a chat message with the component highlight info and blink button
+  addComponentHighlightChatMessage(info, rows, componentName, pattern);
+}
+
+void BlinkBoardWidget::addComponentHighlightChatMessage(const QString& info, const QJsonArray& rows, const QString& componentName, const QString& pattern) {
+  QString timestamp = QDateTime::currentDateTime().toString("hh:mm:ss");
+  
+  // Clear any previous component highlight data
+  m_lastComponentHighlight = QJsonObject();
+  
+  // Store the component highlight data for later use
+  m_lastComponentHighlight["info"] = info;
+  m_lastComponentHighlight["rows"] = rows;
+  m_lastComponentHighlight["component_name"] = componentName;
+  m_lastComponentHighlight["pattern"] = pattern;
+  
+  // Remove any existing component highlight widget to prevent layout issues
+  if (m_currentHighlightWidget) {
+    m_mainLayout->removeWidget(m_currentHighlightWidget);
+    m_currentHighlightWidget->deleteLater();
+    m_currentHighlightWidget = nullptr;
+  }
+  
+  // Create a custom widget for the component highlight
+  QWidget* highlightWidget = new QWidget();
+  highlightWidget->setObjectName("ComponentHighlightWidget");
+  QHBoxLayout* highlightLayout = new QHBoxLayout(highlightWidget);
+  highlightLayout->setContentsMargins(12, 12, 12, 12);
+  highlightLayout->setSpacing(15);
+  
+  // Create info label
+  QLabel* infoLabel = new QLabel(info);
+  infoLabel->setWordWrap(true);
+  infoLabel->setStyleSheet("QLabel { background-color: #f8f9fa; color: #323232; padding: 8px; border-radius: 6px; font-family: Droid Sans; font-size: 11px; line-height: 1.4; }");
+  highlightLayout->addWidget(infoLabel, 1); // Give it stretch factor 1 to take available space
+  
+  // Create blink button
+  QPushButton* blinkButton = new QPushButton("Blink Component");
+  blinkButton->setStyleSheet("QPushButton { background: #6c757d; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-family: Droid Sans; font-size: 12px; font-weight: bold; } QPushButton:hover { background: #5a6268; } QPushButton:pressed { background: #495057; }");
+  blinkButton->setFixedWidth(150);
+  blinkButton->setCursor(Qt::PointingHandCursor);
+  highlightLayout->addWidget(blinkButton, 0); // No stretch, fixed size
+  
+  // Set the widget background and border
+  highlightWidget->setStyleSheet("QWidget#ComponentHighlightWidget { background-color: #f8f9fa; border: 2px solid #6c757d; border-radius: 8px; }");
+  
+  // Connect button click to send blink request
+  connect(blinkButton, &QPushButton::clicked, [this, rows, componentName, pattern]() {
+    // Create a test object for the blink request
+    QJsonObject test;
+    test["type"] = "component_highlight";
+    test["title"] = QString("Blink %1").arg(componentName);
+    
+    QJsonObject jsondata;
+    jsondata["rows"] = rows;
+    jsondata["component_name"] = componentName;
+    jsondata["pattern"] = pattern;
+    test["jsondata"] = jsondata;
+    
+    // Send blink request to backend
+    handleBlinkRequest(test, "blink");
+    
+    // Add confirmation message to chat
+    addChatMessage(QString("🔘 Blinking %1...").arg(componentName), false);
+  });
+  
+  // Add timestamp
+  QLabel* timestampLabel = new QLabel(timestamp);
+  timestampLabel->setStyleSheet("QLabel { color: #777777; font-family: Droid Sans; font-size: 9px; background-color: #f8f9fa; padding: 4px 8px; border-radius: 4px; }");
+  timestampLabel->setAlignment(Qt::AlignRight);
+  highlightLayout->addWidget(timestampLabel);
+  
+  // Store reference to the new widget
+  m_currentHighlightWidget = highlightWidget;
+  
+  // Add a separator message to the chat
+  addChatMessage("🔘 Component Highlight received", false);
+  
+  // Add the highlight widget to the main layout after the chat display
+  // We'll insert it after the chat display but before the input area
+  int chatIndex = m_mainLayout->indexOf(m_chatDisplay);
+  if (chatIndex >= 0) {
+    m_mainLayout->insertWidget(chatIndex + 1, highlightWidget);
+  } else {
+    m_mainLayout->addWidget(highlightWidget);
+  }
+  
+  // Add some spacing around the widget
+  m_mainLayout->insertSpacing(chatIndex >= 0 ? chatIndex + 2 : m_mainLayout->count(), 10);
+  
+  // Auto-scroll to bottom
+  QTextCursor cursor = m_chatDisplay->textCursor();
+  cursor.movePosition(QTextCursor::End);
+  m_chatDisplay->setTextCursor(cursor);
+}
+
+void BlinkBoardWidget::showComponentHighlightStatus() {
+  if (m_lastComponentHighlight.isEmpty()) {
+    addChatMessage("ℹ️ No component is currently highlighted", false);
+    return;
+  }
+  
+  QString componentName = m_lastComponentHighlight["component_name"].toString();
+  QString info = m_lastComponentHighlight["info"].toString();
+  
+  addChatMessage(QString("🔘 Currently highlighted: %1").arg(componentName), false);
+  addChatMessage(QString("📋 %1").arg(info), false);
+  addChatMessage("💡 Type 'blink' to highlight this component on the board", false);
 }

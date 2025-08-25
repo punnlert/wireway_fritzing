@@ -73,7 +73,7 @@ function createErrorResponse(error, lineNumber) {
   };
 }
 
-const testing_tools = [
+const tests_functions = [
   {
     type: "function",
     name: "add_self_observe_test",
@@ -261,19 +261,9 @@ const testing_tools = [
     },
     strict: true,
   },
-  {
-    type: "function",
-    name: "request_schematics",
-    description:
-      "Request the schematics of the circuit. This is useful when you want to be reminded of how the circuit is wired. You can request the schematics of the circuit and then add the component to the circuit.",
-    parameters: {
-      type: "object",
-      properties: {},
-      required: [],
-      additionalProperties: false,
-    },
-    strict: true,
-  },
+];
+
+const suggestion_functions = [
   {
     type: "function",
     name: "add_new_component_suggestion",
@@ -472,6 +462,51 @@ const testing_tools = [
     },
     strict: true,
   },
+];
+
+const schematics_functions = [
+  {
+    type: "function",
+    name: "request_schematics",
+    description:
+      "Request the schematics of the circuit. This is useful when you want to be reminded of how the circuit is wired. You can request the schematics of the circuit and then add the component to the circuit.",
+    parameters: {
+      type: "object",
+      properties: {},
+      required: [],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    type: "function",
+    name: "add_component_highlight_chat",
+    description:
+      "Highlight a component in the circuit. This is useful if you want to point out to the user where a component is in the circuit. You can request the schematics of the circuit and then highlight the component. this will appear directly in the chat window as a button that the user can click to highlight the component.",
+    parameters: {
+      type: "object",
+      properties: {
+        info: { type: "string" },
+        rows: {
+          type: "array",
+          description:
+            "the rows of the component that you want to highlight. only input the rows that you need to support your statement.",
+          items: { type: "number", maximum: 50, minimum: 1 },
+        },
+        component_name: { type: "string" },
+        pattern: {
+          type: "string",
+          enum: ["blink", "blink2", "on", "off"],
+        },
+      },
+      required: ["info", "rows", "component_name", "pattern"],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+];
+
+const testing_tools = [
   {
     type: "function",
     name: "add_test_group",
@@ -488,9 +523,14 @@ const testing_tools = [
     },
     strict: true,
   },
+  ...suggestion_functions,
+  ...schematics_functions,
+  ...tests_functions,
 ];
 
 const suggesting_tools = [
+  ...suggestion_functions,
+  ...schematics_functions,
   {
     type: "function",
     name: "add_suggestion_group",
@@ -503,217 +543,6 @@ const suggesting_tools = [
         description: { type: "string" },
       },
       required: ["title", "description"],
-      additionalProperties: false,
-    },
-    strict: true,
-  },
-  {
-    type: "function",
-    name: "request_schematics",
-    description:
-      "Request the schematics of the circuit. This is useful when you want to be reminded of how the circuit is wired. You can request the schematics of the circuit and then add the component to the circuit.",
-    parameters: {
-      type: "object",
-      properties: {},
-      required: [],
-      additionalProperties: false,
-    },
-    strict: true,
-  },
-  {
-    type: "function",
-    name: "add_new_component_suggestion",
-    description:
-      "If there's a component that you think should be added in the circuit, you can add a suggestion here. e.g. add a resistor to the circuit",
-    parameters: {
-      type: "object",
-      properties: {
-        title: { type: "string" },
-        description: { type: "string" },
-        test_group_id: {
-          type: "string",
-          description:
-            "the id of the test group to add the test to. you must provide it every time for it to be added to the correct group. if you don't have any test group available, you can add a test group first by calling the add_test_group function",
-        },
-        jsondata: {
-          type: "object",
-          properties: {
-            component_name: { type: "string" },
-            component_value: { type: "string" },
-            connections: {
-              type: "array",
-              description:
-                "the connections of the component. e.g. [1, 2, 3] means the component is connected to the 1st, 2nd, and 3rd rows. some connections maybe crossing the middle of the board. e.g. [1, 26], or [n, n+25] n < 25 (refer to the blinkboard schematics).",
-              items: {
-                type: "number",
-                maximum: 50,
-                minimum: 1,
-              },
-            },
-          },
-          required: ["component_name", "component_value", "connections"],
-          additionalProperties: false,
-        },
-      },
-      required: ["title", "description", "jsondata", "test_group_id"],
-      additionalProperties: false,
-    },
-    strict: true,
-  },
-  {
-    type: "function",
-    name: "add_switch_connection_suggestion",
-    description:
-      "Sometimes, the student might mistakenly connect some pins in the wrong hole. This is how we suggest them to fix it.",
-    parameters: {
-      type: "object",
-      properties: {
-        title: { type: "string" },
-        description: { type: "string" },
-        test_group_id: {
-          type: "string",
-          description:
-            "the id of the test group to add the test to. you must provide it every time for it to be added to the correct group. if you don't have any test group available, you can add a test group first by calling the add_test_group function",
-        },
-        jsondata: {
-          type: "object",
-          properties: {
-            row_from: {
-              type: "string",
-              enum: [
-                "1",
-                "2",
-                "3",
-                "4",
-                "5",
-                "6",
-                "7",
-                "8",
-                "9",
-                "10",
-                "11",
-                "12",
-                "13",
-                "14",
-                "15",
-                "16",
-                "17",
-                "18",
-                "19",
-                "20",
-                "21",
-                "22",
-                "23",
-                "24",
-                "25",
-                "26",
-                "27",
-                "28",
-                "29",
-                "30",
-                "31",
-                "32",
-                "33",
-                "34",
-                "35",
-                "36",
-                "37",
-                "38",
-                "39",
-                "40",
-                "41",
-                "42",
-                "43",
-                "44",
-                "45",
-                "46",
-                "47",
-                "48",
-                "49",
-                "50",
-                "a0",
-                "a1",
-                "a2",
-                "d0",
-                "d1",
-                "d2",
-                "vcc",
-                "gnd",
-              ],
-              description:
-                "the row that the student mistakenly connected. please note that these are the rows name for all rows available on the blinkboards. other component may have pins with the same name. be careful to not make mistake.",
-            },
-            row_to: {
-              type: "string",
-              description:
-                "the row that the student should connect to. please note that these are the rows name for all rows available on the blinkboards. other component may have pins with the same name. be careful to not make mistake.",
-              enum: [
-                "1",
-                "2",
-                "3",
-                "4",
-                "5",
-                "6",
-                "7",
-                "8",
-                "9",
-                "10",
-                "11",
-                "12",
-                "13",
-                "14",
-                "15",
-                "16",
-                "17",
-                "18",
-                "19",
-                "20",
-                "21",
-                "22",
-                "23",
-                "24",
-                "25",
-                "26",
-                "27",
-                "28",
-                "29",
-                "30",
-                "31",
-                "32",
-                "33",
-                "34",
-                "35",
-                "36",
-                "37",
-                "38",
-                "39",
-                "40",
-                "41",
-                "42",
-                "43",
-                "44",
-                "45",
-                "46",
-                "47",
-                "48",
-                "49",
-                "50",
-                "a0",
-                "a1",
-                "a2",
-                "d0",
-                "d1",
-                "d2",
-                "vcc",
-                "gnd",
-              ],
-            },
-          },
-          required: ["row_from", "row_to"],
-          additionalProperties: false,
-        },
-      },
-      required: ["title", "description", "jsondata", "test_group_id"],
       additionalProperties: false,
     },
     strict: true,
@@ -1040,6 +869,23 @@ function add_new_component_suggestion({
   }
 }
 
+function add_component_highlight_chat({ rows, component_name, pattern, info }) {
+  process.stdout.write(
+    JSON.stringify({
+      type: "component_highlight_chat",
+      rows: rows,
+      component_name: component_name,
+      pattern: pattern,
+      info: info,
+    }) + "\n"
+  );
+  return {
+    status: "success",
+    message: "Component highlight chat added",
+    timestamp: Date.now(),
+  };
+}
+
 function request_schematics() {
   return {
     status: "success",
@@ -1279,6 +1125,22 @@ class EventHandler extends EventEmitter {
                 timestamp: Date.now(),
               }) + "\n"
             );
+
+            openai_chat_history.push({
+              type: "function_call_output",
+              call_id: response.call_id,
+              output: JSON.stringify(result),
+            });
+          } else if (response.name === "add_component_highlight_chat") {
+            const { rows, component_name, pattern, info } = JSON.parse(
+              response.arguments
+            );
+            const result = add_component_highlight_chat({
+              rows,
+              component_name,
+              pattern,
+              info,
+            });
 
             openai_chat_history.push({
               type: "function_call_output",
@@ -1938,6 +1800,9 @@ async function processCommand(command) {
           if (blinkboard_digital_row) {
             blink_command_pin(blinkboard_digital_row.toLowerCase(), "blink");
           }
+        } else if (test.type === "component_highlight") {
+          const { rows, pattern } = test.jsondata;
+          blink_rows(rows, pattern);
         }
 
         setTimeout(() => {
