@@ -13,6 +13,20 @@
 #include <QHash>
 #include <QList>
 #include <QPointer>
+#include <QRandomGenerator> // Added for session ID generation
+#include <QFile> // Added for logging
+#include <QJsonDocument> // Added for logging
+#include <QJsonObject> // Added for logging
+#include <QJsonArray> // Added for logging
+#include <QDateTime> // Added for logging
+#include <QDebug> // Added for logging
+#include <QDir> // Added for logging
+#include <QFileInfo> // Added for logging
+#include <QDomDocument> // Added for logging
+#include <QDomElement> // Added for logging
+#include <QHash> // Added for logging
+#include <QList> // Added for logging
+#include <QPointer> // Added for logging
 
 // Forward declarations for sketch-related classes
 class MainWindow;
@@ -131,6 +145,7 @@ BlinkBoardWidget::BlinkBoardWidget(QWidget *parent)
   connect(m_updateSchematicsButton, SIGNAL(clicked()), this, SLOT(handleUpdateSchematics()));
   connect(m_messageInput, SIGNAL(returnPressed()), this, SLOT(handleSendMessage()));
   connect(m_modeToggleButton, SIGNAL(clicked()), this, SLOT(handleModeToggle()));
+  connect(m_saveLogsButton, SIGNAL(clicked()), this, SLOT(handleSaveLogs()));
 
   // Connect Node.js process signals
   connect(m_nodeProcess, &QProcess::readyReadStandardOutput, 
@@ -215,6 +230,16 @@ BlinkBoardWidget::BlinkBoardWidget(QWidget *parent)
   // Add Node.js connection button at the bottom
   m_mainLayout->addWidget(m_actionButton);
   
+  // Add Save Logs button below the connection button
+  m_saveLogsButton = new QPushButton("Save Logs (0)");
+  m_saveLogsButton->setStyleSheet("QPushButton { padding: 8px 16px; background: #6c757d; color: white; border: 1px solid #5a6268; border-radius: 0px; font-family: 'Droid Sans'; font-size: 10px; } QPushButton:hover { background: #5a6268; } QPushButton:pressed { background: #495057; }");
+  m_saveLogsButton->setCursor(Qt::PointingHandCursor);
+  m_saveLogsButton->setToolTip("Manually save all pending logs to file");
+  
+  // Add small spacing between buttons
+  m_mainLayout->addSpacing(5);
+  m_mainLayout->addWidget(m_saveLogsButton);
+  
   // Set stretch factors to make chat area expand
   m_mainLayout->setStretch(0, 1); // Chat display gets most space
   m_mainLayout->setStretch(1, 0); // Help label fixed height
@@ -222,10 +247,25 @@ BlinkBoardWidget::BlinkBoardWidget(QWidget *parent)
   m_mainLayout->setStretch(3, 0); // Mode layout (indicator + toggle) fixed height
   m_mainLayout->setStretch(4, 0); // Input area fixed height
   m_mainLayout->setStretch(5, 0); // Separator fixed height
-  m_mainLayout->setStretch(6, 0); // Button fixed height
+  m_mainLayout->setStretch(6, 0); // Connection button fixed height
+  m_mainLayout->setStretch(7, 0); // Spacing fixed height
+  m_mainLayout->setStretch(8, 0); // Save logs button fixed height
 
   frame->setLayout(m_mainLayout);
   frame->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+  
+  // Initialize logging
+  m_sessionStartTime = QDateTime::currentDateTime();
+  m_sessionId = QString("session_%1_%2")
+                .arg(m_sessionStartTime.toMSecsSinceEpoch())
+                .arg(QRandomGenerator::global()->bounded(1000, 9999));
+  
+  qDebug() << "🆔 Session started with ID:" << m_sessionId;
+  
+  // Set up periodic log saving (every 30 seconds)
+  m_logSaveTimer = new QTimer(this);
+  connect(m_logSaveTimer, &QTimer::timeout, this, &BlinkBoardWidget::saveLogsToFile);
+  m_logSaveTimer->start(30000); // 30 seconds
   
   // Style the main frame to match Fritzing background
   frame->setStyleSheet("QFrame { background-color: #d9d9d9; border: none; }");
@@ -242,6 +282,82 @@ BlinkBoardWidget::BlinkBoardWidget(QWidget *parent)
 
   // Add welcome message
   // addChatMessage("Welcome to BlinkBoard Chat! Connect to the Node.js backend to start chatting.", false);
+}
+
+void BlinkBoardWidget::logUserAction(const QString &action, const QJsonObject &details) {
+  QJsonObject logEntry;
+  logEntry["timestamp"] = QDateTime::currentDateTime().toString(Qt::ISODate);
+  logEntry["sessionId"] = m_sessionId;
+  logEntry["action"] = action;
+  logEntry["details"] = details;
+  
+  // Add context information
+  QJsonObject context;
+  context["backendConnected"] = (m_nodeProcess->state() == QProcess::Running);
+  context["hasSketch"] = !currentNetlistXml().isEmpty();
+  context["highlightedComponentsCount"] = m_highlightedComponents.size();
+  logEntry["context"] = context;
+  
+  m_actionLogs.append(logEntry);
+  
+  // Debug output
+  qDebug() << "📝 Logged action:" << action << "Details:" << details;
+  
+  // Update the Save Logs button text to show current count
+  if (m_saveLogsButton) {
+    m_saveLogsButton->setText(QString("Save Logs (%1)").arg(m_actionLogs.size()));
+  }
+  
+  // Save logs periodically (every 10 actions)
+  if (m_actionLogs.size() % 10 == 0) {
+    saveLogsToFile();
+  }
+}
+
+void BlinkBoardWidget::saveLogsToFile() {
+  // Create logs directory if it doesn't exist
+  QDir projectDir = QDir::currentPath();
+  if (projectDir.dirName() == "build") {
+    projectDir.cdUp(); // Go up from build directory to project root
+  }
+  
+  QString logDirPath = projectDir.absolutePath() + "/log";
+  QDir logDir(logDirPath);
+  if (!logDir.exists()) {
+    logDir.mkpath(".");
+  }
+  
+  // Create session log file
+  QString filename = QString("session_%1_%2.json")
+                    .arg(m_sessionId)
+                    .arg(QDateTime::currentDateTime().toString("yyyy-MM-dd"));
+  QString filePath = logDir.absoluteFilePath(filename);
+  
+  // Create complete log document
+  QJsonObject logDocument;
+  logDocument["sessionInfo"] = QJsonObject{
+    {"sessionId", m_sessionId},
+    {"startTime", m_sessionStartTime.toString(Qt::ISODate)},
+    {"lastUpdated", QDateTime::currentDateTime().toString(Qt::ISODate)},
+    {"totalActions", m_actionLogs.size()}
+  };
+  logDocument["actions"] = m_actionLogs;
+  
+  QJsonDocument doc(logDocument);
+  QFile file(filePath);
+  
+  if (file.open(QIODevice::WriteOnly)) {
+    file.write(doc.toJson(QJsonDocument::Indented));
+    file.close();
+    qDebug() << "💾 Logs saved to:" << filePath;
+    
+    // Update the Save Logs button text to show 0 after saving
+    if (m_saveLogsButton) {
+      m_saveLogsButton->setText("Save Logs (0)");
+    }
+  } else {
+    qDebug() << "❌ Failed to save logs to:" << filePath;
+  }
 }
 
 void BlinkBoardWidget::updateContent() {
@@ -453,6 +569,14 @@ void BlinkBoardWidget::handleNodeStarted() {
   // Update button to green (connected)
   updateButtonColor(true);
   
+  // Log backend connection
+  QJsonObject details;
+  details["connectionTime"] = QDateTime::currentDateTime().toString(Qt::ISODate);
+  details["processId"] = m_nodeProcess->processId();
+  details["connectionType"] = "initial";
+  
+  logUserAction("backend_connected", details);
+  
   // Automatically request tests from the backend when it starts
   QTimer::singleShot(1000, this, [this]() {
     if (m_nodeProcess->state() == QProcess::Running) {
@@ -481,6 +605,14 @@ void BlinkBoardWidget::handleNodeFinished(int exitCode, QProcess::ExitStatus exi
   
   // Add chat message about disconnection
   addChatMessage("Node.js backend disconnected.", false);
+  
+  // Log backend disconnection
+  QJsonObject details;
+  details["disconnectionTime"] = QDateTime::currentDateTime().toString(Qt::ISODate);
+  details["exitCode"] = exitCode;
+  details["exitStatus"] = exitStatus;
+  
+  logUserAction("backend_disconnected", details);
 }
 
 void BlinkBoardWidget::handleSendMessage() {
@@ -488,6 +620,24 @@ void BlinkBoardWidget::handleSendMessage() {
   if (message.isEmpty()) {
     return;
   }
+  
+  // Log chat message before processing
+  QJsonObject details;
+  details["message"] = message;
+  details["messageLength"] = message.length();
+  details["mode"] = m_isAskingMode ? "asking" : "testing";
+  details["hasHighlightedComponents"] = !m_highlightedComponents.isEmpty();
+  details["highlightedComponentsCount"] = m_highlightedComponents.size();
+  
+  if (!m_highlightedComponents.isEmpty()) {
+    QJsonArray highlightedArray;
+    for (const auto &component : m_highlightedComponents) {
+      highlightedArray.append(component);
+    }
+    details["highlightedComponents"] = highlightedArray;
+  }
+  
+  logUserAction("chat_sent", details);
   
   // Check if this is a blink command for the last highlighted component
   if (message.toLower() == "blink" && !m_lastComponentHighlight.isEmpty()) {
@@ -595,6 +745,15 @@ void BlinkBoardWidget::handleSendMessage() {
 }
 
 void BlinkBoardWidget::handleMessageReceived(const QString &message) {
+  // Log received message
+  QJsonObject details;
+  details["message"] = message;
+  details["messageLength"] = message.length();
+  details["source"] = "backend";
+  details["timestamp"] = QDateTime::currentDateTime().toString(Qt::ISODate);
+  
+  logUserAction("input_received", details);
+  
   addChatMessage(message, false);
 }
 
@@ -639,6 +798,14 @@ void BlinkBoardWidget::handleUpdateSchematics() {
 
   // Add user message to chat
   addChatMessage("Updating schematics with current netlist...", true);
+  
+  // Log schematic update
+  QJsonObject details;
+  details["netlistSize"] = netlistXml.length();
+  details["hasCode"] = true; // We're sending code to backend
+  details["updateTime"] = QDateTime::currentDateTime().toString(Qt::ISODate);
+  
+  logUserAction("schematic_update", details);
 
   // Send the netlist XML to the Node.js backend
   QJsonObject jsonCommand;
@@ -997,6 +1164,27 @@ void BlinkBoardWidget::submitTestResultsToBackend(const QString &groupId, const 
 
 void BlinkBoardWidget::handleBlinkRequest(const QJsonObject &test, const QString &action)
 {
+  if (m_nodeProcess->state() == QProcess::Running) {
+    // Log blink request
+    QJsonObject details;
+    details["action"] = action;
+    details["testType"] = test["type"].toString();
+    details["testTitle"] = test["title"].toString();
+    details["hasJsonData"] = test.contains("jsondata");
+    
+    if (test.contains("jsondata")) {
+      QJsonObject jsondata = test["jsondata"].toObject();
+      if (jsondata.contains("component_name")) {
+        details["componentName"] = jsondata["component_name"].toString();
+      }
+      if (jsondata.contains("rows")) {
+        details["rowsCount"] = jsondata["rows"].toArray().size();
+      }
+    }
+    
+    logUserAction("blink_added", details);
+  }
+
   if (m_nodeProcess->state() != QProcess::Running) {
     addChatMessage("Not connected to backend. Cannot send blink command.", false);
     return;
@@ -1015,7 +1203,7 @@ void BlinkBoardWidget::handleBlinkRequest(const QJsonObject &test, const QString
   qDebug() << "🔘 Sending blink request to Node.js backend:" << jsonString.left(200) + "...";
   m_nodeProcess->write(jsonString.toUtf8() + "\n");
   
-  addChatMessage("Blink command sent to backend.", false);
+  // addChatMessage("Blink command sent to backend.", false);
 }
 
 /**
@@ -1219,6 +1407,16 @@ void BlinkBoardWidget::handleComponentHighlighted(const QJsonObject& componentDa
   qDebug() << "=== COMPONENT HIGHLIGHT DATA RECEIVED ===";
   qDebug() << "Raw JSON data:" << componentData;
   
+  // Log component highlight
+  QJsonObject details;
+  details["componentName"] = componentData["component_title"].toString();
+  details["componentId"] = componentData["component_id"].toString();
+  details["rows"] = componentData["rows"];
+  details["pattern"] = componentData["pattern"].toString();
+  details["highlightTime"] = QDateTime::currentDateTime().toString(Qt::ISODate);
+  
+  logUserAction("component_highlighted", details);
+  
   // Store the highlighted component locally for context
   addHighlightedComponent(componentData);
   
@@ -1335,6 +1533,14 @@ void BlinkBoardWidget::handleModeToggle() {
   m_isAskingMode = !m_isAskingMode;
   QString modeText = m_isAskingMode ? "Asking" : "Testing";
   m_modeToggleButton->setText(modeText);
+  
+  // Log mode change
+  QJsonObject details;
+  details["previousMode"] = m_isAskingMode ? "testing" : "asking";
+  details["newMode"] = m_isAskingMode ? "asking" : "testing";
+  details["toggleTime"] = QDateTime::currentDateTime().toString(Qt::ISODate);
+  
+  logUserAction("mode_change", details);
   
   // Update button styling based on mode
   if (m_isAskingMode) {
@@ -1468,4 +1674,46 @@ void BlinkBoardWidget::showComponentHighlightStatus() {
   // addChatMessage(QString("🔘 Currently highlighted: %1").arg(componentName), false);
   // addChatMessage(QString("📋 %1").arg(info), false);
   // addChatMessage("💡 Type 'blink' to highlight this component on the board", false);
+}
+
+BlinkBoardWidget::~BlinkBoardWidget() {
+  // Save final logs
+  saveLogsToFile();
+  
+  // Log session end
+  QJsonObject sessionEnd;
+  sessionEnd["sessionDuration"] = m_sessionStartTime.msecsTo(QDateTime::currentDateTime());
+  sessionEnd["totalActionsLogged"] = m_actionLogs.size();
+  
+  logUserAction("session_end", sessionEnd);
+  saveLogsToFile();
+  
+  qDebug() << "🔄 Session ended. Total actions logged:" << m_actionLogs.size();
+}
+
+void BlinkBoardWidget::handleSaveLogs() {
+  // Log the manual save action
+  QJsonObject details;
+  details["manualSave"] = true;
+  details["pendingActionsCount"] = m_actionLogs.size();
+  details["saveTime"] = QDateTime::currentDateTime().toString(Qt::ISODate);
+  
+  logUserAction("manual_log_save", details);
+  
+  // Save all pending logs to file
+  saveLogsToFile();
+  
+  // Provide user feedback
+  addChatMessage("📝 Logs saved successfully!", false);
+  
+  // Update button text temporarily to show success
+  QString originalText = "Save Logs (0)";
+  m_saveLogsButton->setText("✓ Saved!");
+  m_saveLogsButton->setStyleSheet("QPushButton { padding: 8px 16px; background: #28a745; color: white; border: 1px solid #1e7e34; border-radius: 0px; font-family: 'Droid Sans'; font-size: 10px; } QPushButton:hover { background: #1e7e34; } QPushButton:pressed { background: #155724; }");
+  
+  // Reset button after 2 seconds
+  QTimer::singleShot(2000, this, [this, originalText]() {
+    m_saveLogsButton->setText(originalText);
+    m_saveLogsButton->setStyleSheet("QPushButton { padding: 8px 16px; background: #6c757d; color: white; border: 1px solid #5a6268; border-radius: 0px; font-family: 'Droid Sans'; font-size: 10px; } QPushButton:hover { background: #5a6268; } QPushButton:pressed { background: #495057; }");
+  });
 }

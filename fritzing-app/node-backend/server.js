@@ -25,7 +25,7 @@ Blinkboard Schematics
 
 where [51, 1] is the positive rail and [52, 1] is a negative rail. The number for the positive and negative rails are just for annotations in the code representation of the circuit. So, instead of saying [51, 1] and [52, 1], you should say "positive rail" and "negative rail". The same row of the breadboard is connected.
 
-PLEASE GIVE CLEAR, CONCISE, AND SHORT RESPONSES. assume that the student is a beginner and doesn't know any technical terms. Use simplist terms as possible and if needed, try to explain the concept in a way that is easy to understand with step by step instructions. you may ask the user to elaborate on some of your instructions when you sense that there's room for ambiguity. Support the user's intention to learn and understand the circuit.
+PLEASE GIVE CLEAR, CONCISE, AND SHORT RESPONSES. assume that the student is a beginner and doesn't know any technical terms and that they need children-level of language. you may ask the user to elaborate on some of your instructions when you sense that there's room for ambiguity. Support the user's intention to learn and understand the circuit. If the user ask for confirmation if anything was correct, you can say "yes" or "no" to confirm.
 `;
 
 const openai = new OpenAI({
@@ -38,6 +38,7 @@ let schematic_file_change = false;
 let testGroups = []; // Store test groups for the test window
 let code_file;
 let code_file_change = false;
+let current_token_usage = 0;
 
 let openai_chat_context = [];
 
@@ -215,46 +216,6 @@ const tests_functions = [
     },
     strict: true,
   },
-  {
-    type: "function",
-    name: "add_analog_voltage_test",
-    description:
-      "Choose a specific row that you want to turn high or low and let the student observe the result of the change. The only measuring i/o row that you can use is D2.",
-    parameters: {
-      type: "object",
-      properties: {
-        title: { type: "string" },
-        description: { type: "string" },
-        test_group_id: {
-          type: "string",
-          description:
-            "the id of the test group to add the test to. you must provide it every time for it to be added to the correct group. if you don't have any test group available, you can add a test group first by calling the add_test_group function",
-        },
-        jsondata: {
-          type: "object",
-          properties: {
-            output_row: {
-              type: "number",
-              description: "the row which you want to output analog voltage",
-              maximum: 50,
-              minimum: 1,
-            },
-            output_voltage: {
-              type: "number",
-              description: "the voltage you want to output",
-              maximum: 4.5,
-              minimum: 0,
-            },
-          },
-          required: ["output_row", "output_voltage"],
-          additionalProperties: false,
-        },
-      },
-      required: ["title", "description", "jsondata", "test_group_id"],
-      additionalProperties: false,
-    },
-    strict: true,
-  },
 ];
 
 const suggestion_functions = [
@@ -298,164 +259,6 @@ const suggestion_functions = [
     },
     strict: true,
   },
-  // {
-  //   type: "function",
-  //   name: "add_switch_connection_suggestion",
-  //   description:
-  //     "Sometimes, the student might mistakenly connect some pins in the wrong hole. This is how we suggest them to fix it.",
-  //   parameters: {
-  //     type: "object",
-  //     properties: {
-  //       title: { type: "string" },
-  //       description: { type: "string" },
-  //       test_group_id: {
-  //         type: "string",
-  //         description:
-  //           "the id of the test group to add the test to. you must provide it every time for it to be added to the correct group. if you don't have any test group available, you can add a test group first by calling the add_test_group function",
-  //       },
-  //       jsondata: {
-  //         type: "object",
-  //         properties: {
-  //           row_from: {
-  //             type: "string",
-  //             enum: [
-  //               "1",
-  //               "2",
-  //               "3",
-  //               "4",
-  //               "5",
-  //               "6",
-  //               "7",
-  //               "8",
-  //               "9",
-  //               "10",
-  //               "11",
-  //               "12",
-  //               "13",
-  //               "14",
-  //               "15",
-  //               "16",
-  //               "17",
-  //               "18",
-  //               "19",
-  //               "20",
-  //               "21",
-  //               "22",
-  //               "23",
-  //               "24",
-  //               "25",
-  //               "26",
-  //               "27",
-  //               "28",
-  //               "29",
-  //               "30",
-  //               "31",
-  //               "32",
-  //               "33",
-  //               "34",
-  //               "35",
-  //               "36",
-  //               "37",
-  //               "38",
-  //               "39",
-  //               "40",
-  //               "41",
-  //               "42",
-  //               "43",
-  //               "44",
-  //               "45",
-  //               "46",
-  //               "47",
-  //               "48",
-  //               "49",
-  //               "50",
-  //               "a0",
-  //               "a1",
-  //               "a2",
-  //               "d0",
-  //               "d1",
-  //               "d2",
-  //               "vcc",
-  //               "gnd",
-  //             ],
-  //             description:
-  //               "the row that the student mistakenly connected. please note that these are the rows name for all rows available on the blinkboards. other component may have pins with the same name. be careful to not make mistake.",
-  //           },
-  //           row_to: {
-  //             type: "string",
-  //             description:
-  //               "the row that the student should connect to. please note that these are the rows name for all rows available on the blinkboards. other component may have pins with the same name. be careful to not make mistake.",
-  //             enum: [
-  //               "1",
-  //               "2",
-  //               "3",
-  //               "4",
-  //               "5",
-  //               "6",
-  //               "7",
-  //               "8",
-  //               "9",
-  //               "10",
-  //               "11",
-  //               "12",
-  //               "13",
-  //               "14",
-  //               "15",
-  //               "16",
-  //               "17",
-  //               "18",
-  //               "19",
-  //               "20",
-  //               "21",
-  //               "22",
-  //               "23",
-  //               "24",
-  //               "25",
-  //               "26",
-  //               "27",
-  //               "28",
-  //               "29",
-  //               "30",
-  //               "31",
-  //               "32",
-  //               "33",
-  //               "34",
-  //               "35",
-  //               "36",
-  //               "37",
-  //               "38",
-  //               "39",
-  //               "40",
-  //               "41",
-  //               "42",
-  //               "43",
-  //               "44",
-  //               "45",
-  //               "46",
-  //               "47",
-  //               "48",
-  //               "49",
-  //               "50",
-  //               "a0",
-  //               "a1",
-  //               "a2",
-  //               "d0",
-  //               "d1",
-  //               "d2",
-  //               "vcc",
-  //               "gnd",
-  //             ],
-  //           },
-  //         },
-  //         required: ["row_from", "row_to"],
-  //         additionalProperties: false,
-  //       },
-  //     },
-  //     required: ["title", "description", "jsondata", "test_group_id"],
-  //     additionalProperties: false,
-  //   },
-  //   strict: true,
-  // },
 ];
 
 const schematics_functions = [
@@ -881,7 +684,7 @@ function add_component_highlight_chat({ rows, component_name, pattern, info }) {
 }
 
 function request_schematics() {
-  if (!!schematics.schematics_yaml) {
+  if (!!schematics) {
     return {
       status: "success",
       message: schematics.schematics_yaml,
@@ -923,7 +726,7 @@ class EventHandler extends EventEmitter {
     try {
       // Retrieve events that are denoted with 'requires_action'
       // since these will have our tool_calls
-      console.log(event.type);
+      console.log(event);
       if (event.type === "response.output_item.added") {
         if (event.item.type === "message" || event.item.type === "reasoning") {
           process.stdout.write(
@@ -1270,6 +1073,7 @@ async function update_schematics(netlist) {
           const schematics_json = JSON.parse(jsonOutput);
           schematic_file_change = true;
           console.log("✅ Both Rust processes completed successfully");
+          console.log(schematics_yaml);
           resolve({ schematics_yaml, schematics_json });
         } catch (parseError) {
           console.error("Error processing outputs:", parseError);
@@ -1547,6 +1351,32 @@ async function send_openai_message(message) {
   const eventHandler = new EventHandler(openai);
   eventHandler.on("event", eventHandler.onEvent.bind(eventHandler));
 
+  if (current_token_usage > 8000) {
+    openai_chat_history = [];
+    current_token_usage = 0;
+
+    openai_chat_history.push({
+      role: "developer",
+      content: SYSTEM_INSTRUCTION,
+    });
+
+    openai_chat_history.push({
+      role: "developer",
+      content: `the operation mode has been changed to <operation_mode> \n ${global_mode} \n </operation_mode>`,
+    });
+    mode_changed = false;
+
+    if (!!schematics) {
+      const update_schematics = `this is the .yaml representation of the schematics \n <schematics_yaml> \n ${schematics.schematics_yaml} \n </schematics_yaml> \n it tells you all the components that connects to each row.`;
+
+      openai_chat_history.push({
+        role: "developer",
+        content: update_schematics,
+      });
+      schematic_file_change = false;
+    }
+  }
+
   if (openai_chat_history.length == 0) {
     openai_chat_history.push({
       role: "developer",
@@ -1563,25 +1393,15 @@ async function send_openai_message(message) {
   }
 
   if (schematic_file_change) {
-    const update_schematics = `this is the .yaml representation of the schematics \n <schematics_yaml> \n ${schematics.schematics_yaml} \n </schematics_yaml> \n `;
+    const update_schematics = `this is the .yaml representation of the schematics \n <schematics_yaml> \n ${schematics.schematics_yaml} \n </schematics_yaml> \n it tells you all the components that connects to each row.`;
 
     openai_chat_history.push({
       role: "developer",
       content: update_schematics,
     });
 
-    // console.log("update_schematics", update_schematics);
-
     schematic_file_change = false;
   }
-
-  // if (code_file_change) {
-  //   openai_chat_history.push({
-  //     role: "developer",
-  //     content: `this is the recent code file that the user has saved. <arduino_code> \n ${code_file} \n </arduino_code>`,
-  //   });
-  //   code_file_change = false;
-  // }
 
   openai_chat_history.push({
     role: "user",

@@ -20,12 +20,14 @@
 #include <QVariant>
 #include <QWidget>
 #include <QObject>
+#include <QFile>
+#include <QDir>
 
 class BlinkBoardWidget : public QScrollArea {
   Q_OBJECT
 public:
   BlinkBoardWidget(QWidget *parent = nullptr);
-  ~BlinkBoardWidget() = default;
+  ~BlinkBoardWidget();
 
   void updateContent();
   void resetLayout();
@@ -93,6 +95,7 @@ protected:
   QLineEdit *m_messageInput;
   QPushButton *m_sendButton;
   QPushButton *m_updateSchematicsButton;
+  QPushButton *m_saveLogsButton; // New button for manually saving logs
   QHBoxLayout *m_inputLayout;
   
   // Mode toggle switch
@@ -143,5 +146,15 @@ protected:
   // Modified chat message handling
   void handleSendMessageWithContext();
   void handleAnalogReadData(const QJsonObject &event);
+  void handleSaveLogs(); // New slot for manually saving logs
+
+private:
+  // Logging functionality
+  void logUserAction(const QString &action, const QJsonObject &details = QJsonObject());
+  void saveLogsToFile();
+  QString m_sessionId;
+  QJsonArray m_actionLogs;
+  QDateTime m_sessionStartTime;
+  QTimer *m_logSaveTimer;
 };
 #endif

@@ -31,6 +31,8 @@ struct XMLParser {
 #[derive(Clone, Hash, Eq, PartialEq, Debug, Serialize)]
 struct Pin {
     row: usize,
+    connected_to_ground: bool,
+    connected_to_power: bool,
     parts: Vec<Part>,
 }
 
@@ -46,12 +48,22 @@ impl Pin {
     fn new(row: usize) -> Self {
         Self {
             row,
+            connected_to_ground: false,
+            connected_to_power: false,
             parts: Vec::new(),
         }
     }
 
     fn add_parts(&mut self, parts: &HashSet<Part>) {
         self.parts.extend(parts.clone());
+    }
+
+    fn set_ground(&mut self) {
+        self.connected_to_ground = true;
+    }
+
+    fn set_power(&mut self) {
+        self.connected_to_power = true;
     }
 }
 
@@ -88,6 +100,8 @@ fn generate_net_pin(element: &Element, connections: &mut Vec<Pin>) {
         "net" => {
             let mut connected_pin: HashSet<Pin> = HashSet::new();
             let mut connected_part: HashSet<Part> = HashSet::new();
+            let mut connected_to_ground = false;
+            let mut connected_to_power = false;
             element.children().for_each(|connector| {
                 connector.children().for_each(|part| {
                     let breadboard_regex = Regex::new(r"^Breadboard.*").unwrap();
@@ -119,12 +133,12 @@ fn generate_net_pin(element: &Element, connections: &mut Vec<Pin>) {
                                 connected_pin.insert(pin);
                             }
                             "W" | "Y" => {
-                                // todo!("power")
+                                connected_to_power = true;
                                 let pin = Pin::new(51);
                                 connected_pin.insert(pin);
                             }
                             "X" | "Z" => {
-                                // todo!("ground")
+                                connected_to_ground = true;
                                 let pin = Pin::new(52);
                                 connected_pin.insert(pin);
                             }
@@ -155,6 +169,12 @@ fn generate_net_pin(element: &Element, connections: &mut Vec<Pin>) {
             connected_pin.iter().for_each(|pin| {
                 let mut new_pin = pin.clone();
                 new_pin.add_parts(&connected_part);
+                if connected_to_ground {
+                    new_pin.set_ground();
+                }
+                if connected_to_power {
+                    new_pin.set_power();
+                }
                 connections.push(new_pin);
             });
         }
