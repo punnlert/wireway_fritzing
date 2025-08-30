@@ -35,6 +35,7 @@ public:
   // Helper methods for accessing sketch data
   QString currentNetlistXml() const;
   QString breadboardNetlistXml() const;
+  QJsonArray getPartsData() const;
 
 public slots:
   void handleBlinkBoardConnectionRequest();

@@ -13,6 +13,7 @@
 #include <QHash>
 #include <QList>
 #include <QPointer>
+#include <QSet>
 #include <QRandomGenerator> // Added for session ID generation
 #include <QFile> // Added for logging
 #include <QJsonDocument> // Added for logging
@@ -36,6 +37,7 @@ class BreadboardSketchWidget;
 class SchematicSketchWidget;
 class ConnectorItem;
 class ErcData;
+class ItemBase;
 
 // Include the actual headers
 #include "../mainwindow/mainwindow.h"
@@ -46,6 +48,7 @@ class ErcData;
 #include "../connectors/connectoritem.h"
 #include "../connectors/ercdata.h"
 #include "../viewlayer.h"
+#include "../items/itembase.h"
 
 BlinkBoardWidget::BlinkBoardWidget(QWidget *parent)
     : QScrollArea(parent), m_actionButton(new QPushButton(tr("Connect to BlinkBoard"))),
@@ -805,18 +808,24 @@ void BlinkBoardWidget::handleUpdateSchematics() {
   details["hasCode"] = true; // We're sending code to backend
   details["updateTime"] = QDateTime::currentDateTime().toString(Qt::ISODate);
   
+  // Get parts data for logging
+  QJsonArray partsData = getPartsData();
+  details["partsCount"] = partsData.size();
+  
   logUserAction("schematic_update", details);
 
-  // Send the netlist XML to the Node.js backend
+  // Send the netlist XML and parts data to the Node.js backend
   QJsonObject jsonCommand;
   jsonCommand["command"] = "update_schematics";
   jsonCommand["netlist"] = netlistXml;
+  jsonCommand["parts"] = partsData;
   jsonCommand["timestamp"] = QDateTime::currentMSecsSinceEpoch();
   
   QJsonDocument doc(jsonCommand);
   QString jsonString = doc.toJson(QJsonDocument::Compact);
   
-  qDebug() << "Sending netlist to Node.js:" << jsonString.left(200) + "...";
+  qDebug() << "Sending netlist and parts data to Node.js:" << jsonString.left(200) + "...";
+  qDebug() << "Parts data contains" << partsData.size() << "parts";
   m_nodeProcess->write(jsonString.toUtf8() + "\n");
   
   // Also send the current code to provide context for the schematic update
@@ -974,6 +983,107 @@ QString BlinkBoardWidget::breadboardNetlistXml() const {
     return doc.toString(-1);
   }
   return QString();
+}
+
+QJsonArray BlinkBoardWidget::getPartsData() const {
+  QJsonArray partsArray;
+  
+  SketchWidget *sk = currentSketchFrom(this);
+  if (!sk) {
+    qDebug() << "No sketch widget available for parts data extraction";
+    return partsArray;
+  }
+
+  // Get all items in the sketch
+  QList<ItemBase*> items;
+  sk->collectParts(items);
+  
+  // qDebug() << "Found" << items.size() << "items in sketch";
+  
+  // Create a map to track parts we've already processed
+  QSet<QString> processedParts;
+  
+  for (auto item : items) {
+    if (!item) {
+      // qDebug() << "Skipping null item in parts data extraction";
+      continue;
+    }
+    
+    QString partId = QString::number(item->id());
+    
+    // Skip if we've already processed this part
+    if (processedParts.contains(partId)) continue;
+    processedParts.insert(partId);
+    
+    // qDebug() << "Processing part:" << item->title() << "with ID:" << partId;
+    
+    QJsonObject partData;
+    partData["part_name"] = item->title();
+    partData["label"] = item->instanceTitle();
+    partData["title"] = item->title();
+    partData["id"] = partId;
+    
+    // Get the connections for this part
+    QJsonArray rows;
+    const QList<ConnectorItem*>& connectors = item->cachedConnectorItems();
+    
+    // qDebug() << "  Found" << connectors.size() << "connectors for part" << item->title();
+    
+    for (auto connector : connectors) {
+      if (!connector) {
+        // qDebug() << "    Skipping null connector";
+        continue;
+      }
+      
+      QJsonObject connection;
+      connection["pin_name"] = connector->connectorSharedName();
+      connection["pin_id"] = connector->connectorSharedID();
+      
+      // qDebug() << "    Processing connector:" << connector->connectorSharedName() << "with ID:" << connector->connectorSharedID();
+      
+      // Find what this pin is connected to
+      const QList<QPointer<ConnectorItem>>& connectedItems = connector->connectedToItems();
+      QJsonArray connectedTo;
+      
+      // qDebug() << "      Found" << connectedItems.size() << "connected items";
+      
+      for (const auto& connectedConnectorPtr : connectedItems) {
+        if (connectedConnectorPtr.isNull()) {
+          // qDebug() << "        Skipping null connected connector pointer";
+          continue;
+        }
+        
+        ConnectorItem* connectedConnector = connectedConnectorPtr.data();
+        if (!connectedConnector) {
+          // qDebug() << "        Skipping null connected connector data";
+          continue;
+        }
+        
+        QJsonObject connectedItem;
+        auto connectedPart = connectedConnector->attachedTo();
+        if (connectedPart) {
+          connectedItem["part_id"] = QString::number(connectedPart->id());
+          connectedItem["part_label"] = connectedPart->instanceTitle();
+          connectedItem["pin_name"] = connectedConnector->connectorSharedName();
+          connectedItem["pin_id"] = connectedConnector->connectorSharedID();
+          
+          // qDebug() << "        Connected to part:" << connectedPart->instanceTitle() << "pin:" << connectedConnector->connectorSharedName();
+        } else {
+          // qDebug() << "        Connected connector has no attached part";
+        }
+        connectedTo.append(connectedItem);
+      }
+      
+      connection["connected_to"] = connectedTo;
+      rows.append(connection);
+    }
+    
+    partData["rows"] = rows;
+    partsArray.append(partData);
+  }
+  
+  // qDebug() << "Parts data extraction complete. Total parts:" << partsArray.size();
+  return partsArray;
 }
 
 void BlinkBoardWidget::updateButtonColor(bool isConnected) {

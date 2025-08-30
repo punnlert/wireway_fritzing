@@ -10,6 +10,7 @@ const { ReadlineParser } = require("@serialport/parser-readline");
 const { spawn } = require("child_process");
 const { SerialPort } = require("serialport");
 const { EventEmitter } = require("events");
+const yaml = require("js-yaml");
 
 const SYSTEM_INSTRUCTION = `You are a teacher assistant in a physical computing class. The class utilize a tool called "BlinkBoard"; a breadboard with built-in LEDs in each row that can light up to signify to the user which row of the board the instructor is referring to. Each connection hole in the BlinkBoard has a specific coordinate in the form of [row, column]. the coordinate maps to the following schema on the Blinkboard;
 Blinkboard Schematics
@@ -25,7 +26,7 @@ Blinkboard Schematics
 
 where [51, 1] is the positive rail and [52, 1] is a negative rail. The number for the positive and negative rails are just for annotations in the code representation of the circuit. So, instead of saying [51, 1] and [52, 1], you should say "positive rail" and "negative rail". The same row of the breadboard is connected.
 
-PLEASE GIVE CLEAR, CONCISE, AND SHORT RESPONSES. assume that the student is a beginner and doesn't know any technical terms and that they need children-level of language. you may ask the user to elaborate on some of your instructions when you sense that there's room for ambiguity. Support the user's intention to learn and understand the circuit. If the user ask for confirmation if anything was correct, you can say "yes" or "no" to confirm.
+PLEASE GIVE CLEAR, CONCISE, AND SHORT RESPONSES. assume that the student is a beginner and doesn't know any technical terms and that they need children-level of language. you may ask the user to elaborate on some of your instructions when you sense that there's room for ambiguity. Support the user's intention to learn and understand the circuit. If the user ask for confirmation if anything was correct, you can say "yes" or "no" to confirm. If you want the user to test something, you can ask them to switch to the test mode if we're not currently in the test mode.
 `;
 
 const openai = new OpenAI({
@@ -34,6 +35,7 @@ const openai = new OpenAI({
 
 let openai_chat_history = [];
 let schematics;
+let parts_connections;
 let schematic_file_change = false;
 let testGroups = []; // Store test groups for the test window
 let code_file;
@@ -266,7 +268,7 @@ const schematics_functions = [
     type: "function",
     name: "request_schematics",
     description:
-      "Request the schematics of the circuit. This is useful when you want to be reminded of how the circuit is wired. You can request the schematics of the circuit and then add the component to the circuit.",
+      'Request the schematics of the circuit. This is useful when you want to be reminded of how the circuit is wired. You can request the schematics of the circuit and then add the component to the circuit. If this fails, you should ask the user to "update the schematics"',
     parameters: {
       type: "object",
       properties: {},
@@ -746,6 +748,7 @@ class EventHandler extends EventEmitter {
           );
         }
       } else if (event.type === "response.completed") {
+        current_token_usage = event.response.usage.total_tokens;
         event.response.output.forEach((output) => {
           openai_chat_history = [...openai_chat_history, output];
         });
@@ -1367,7 +1370,11 @@ async function send_openai_message(message) {
     mode_changed = false;
 
     if (!!schematics) {
-      const update_schematics = `this is the .yaml representation of the schematics \n <schematics_yaml> \n ${schematics.schematics_yaml} \n </schematics_yaml> \n it tells you all the components that connects to each row.`;
+      const update_schematics = `this is the .yaml representation of the schematics \n <schematics_yaml> \n ${
+        schematics.schematics_yaml
+      } \n </schematics_yaml> \n it tells you all the components that connects to each row. \n and this is the positional connections of the parts. \n <parts_connections> \n ${JSON.stringify(
+        parts_connections
+      )} \n </parts_connections>`;
 
       openai_chat_history.push({
         role: "developer",
@@ -1393,7 +1400,11 @@ async function send_openai_message(message) {
   }
 
   if (schematic_file_change) {
-    const update_schematics = `this is the .yaml representation of the schematics \n <schematics_yaml> \n ${schematics.schematics_yaml} \n </schematics_yaml> \n it tells you all the components that connects to each row.`;
+    const update_schematics = `this is the .yaml representation of the schematics \n <schematics_yaml> \n ${
+      schematics.schematics_yaml
+    } \n </schematics_yaml> \n it tells you all the components that connects to each row. \n and this is the positional connections of the parts. \n <parts_connections> \n ${JSON.stringify(
+      parts_connections
+    )} \n </parts_connections>`;
 
     openai_chat_history.push({
       role: "developer",
@@ -1537,6 +1548,30 @@ async function processCommand(command) {
     case "update_schematics":
       try {
         schematics = await update_schematics(command.netlist);
+        parts_connections = yaml.dump(
+          command.parts
+            .filter(
+              (part) =>
+                part.part_name != "Arduino Uno (Rev3)" &&
+                part.part_name != "Half breadboard"
+            )
+            .map((part) => {
+              return {
+                name: part.part_name,
+                connected_to_row: part.rows.flatMap((row) => {
+                  return row.connected_to
+                    .filter((part) => part.part_label === "Breadboard1")
+                    .map((part) => {
+                      return `pin: ${
+                        row.pin_name
+                      } -> row: ${convert_pinname_to_row_num(part.pin_id)}`;
+                    });
+                }),
+                id: part.id,
+                label: part.label,
+              };
+            })
+        );
         return {
           status: "success",
           message: JSON.stringify(schematics),
