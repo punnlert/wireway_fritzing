@@ -28,6 +28,7 @@ along with Fritzing.  If not, see <http://www.gnu.org/licenses/>.
 #include "../sketch/infographicsview.h"
 #include "../connectors/connector.h"
 #include "../connectors/bus.h"
+#include "../connectors/ercdata.h"
 #include "partlabel.h"
 #include "../layerattributes.h"
 #include "../fsvgrenderer.h"
@@ -1119,6 +1120,26 @@ void ItemBase::mousePressEvent(QGraphicsSceneMouseEvent *event) {
 										pinInfo["name"] = pinName;
 										pinInfo["connection"] = connection;
 										
+										// Add pin type information
+										pinInfo["type"] = Connector::connectorNameFromType(connector->connectorType()); // Returns "male", "female", "wire", "pad"
+										pinInfo["description"] = connector->connectorSharedDescription();
+										
+										// Add electrical properties if available
+										if (connector->connectorSharedErcData()) {
+											ErcData *ercData = connector->connectorSharedErcData();
+											if (ercData->eType() == ErcData::VCC) {
+												pinInfo["electrical_type"] = "VCC";
+											} else if (ercData->eType() == ErcData::Ground) {
+												pinInfo["electrical_type"] = "Ground";
+											}
+											
+											if (ercData->currentFlow() == ErcData::Source) {
+												pinInfo["current_flow"] = "source";
+											} else if (ercData->currentFlow() == ErcData::Sink) {
+												pinInfo["current_flow"] = "sink";
+											}
+										}
+										
 										pinsArray.append(pinInfo);
 									}
 								}
@@ -1203,6 +1224,26 @@ void ItemBase::mouseDoubleClickEvent(QGraphicsSceneMouseEvent *event)
 										
 										pinInfo["name"] = pinName;
 										pinInfo["connection"] = connection;
+										
+										// Add pin type information
+										pinInfo["type"] = Connector::connectorNameFromType(connector->connectorType()); // Returns "male", "female", "wire", "pad"
+										pinInfo["description"] = connector->connectorSharedDescription();
+										
+										// Add electrical properties if available
+										if (connector->connectorSharedErcData()) {
+											ErcData *ercData = connector->connectorSharedErcData();
+											if (ercData->eType() == ErcData::VCC) {
+												pinInfo["electrical_type"] = "VCC";
+											} else if (ercData->eType() == ErcData::Ground) {
+												pinInfo["electrical_type"] = "Ground";
+											}
+											
+											if (ercData->currentFlow() == ErcData::Source) {
+												pinInfo["current_flow"] = "source";
+											} else if (ercData->currentFlow() == ErcData::Sink) {
+												pinInfo["current_flow"] = "sink";
+											}
+										}
 										
 										pinsArray.append(pinInfo);
 									}
@@ -2845,7 +2886,7 @@ QJsonArray ItemBase::collectMultipleBreadboardComponentsData(const QList<QGraphi
 		componentData["component_id"] = QString::number(itemBase->id());
 		componentData["component_title"] = itemBase->title();
 		
-		// Get actual breadboard pin connections
+		// Get actual breadboard pin connections with enhanced information
 		QJsonArray pinsArray;
 		const QList<ConnectorItem *> &connectors = itemBase->cachedConnectorItems();
 		
@@ -2856,7 +2897,41 @@ QJsonArray ItemBase::collectMultipleBreadboardComponentsData(const QList<QGraphi
 						if (connectedConnector) {
 							ItemBase *connectedItem = connectedConnector->attachedTo();
 							if (connectedItem && connectedItem->viewID() == ViewLayer::BreadboardView) {
-								QString pinInfo = QString("%1").arg(connectedConnector->connectorSharedID());
+								// Create detailed pin object instead of just string
+								QJsonObject pinInfo;
+								
+								// Get pin name/description from connector
+								QString pinName = connector->connectorSharedName();
+								if (pinName.isEmpty()) {
+									pinName = QString("Pin %1").arg(connector->connectorSharedID());
+								}
+								
+								// Get breadboard connection location
+								QString connection = connectedConnector->connectorSharedID();
+								
+								pinInfo["name"] = pinName;
+								pinInfo["connection"] = connection;
+								
+								// Add pin type information
+								pinInfo["type"] = Connector::connectorNameFromType(connector->connectorType());
+								pinInfo["description"] = connector->connectorSharedDescription();
+								
+								// Add electrical properties if available
+								if (connector->connectorSharedErcData()) {
+									ErcData *ercData = connector->connectorSharedErcData();
+									if (ercData->eType() == ErcData::VCC) {
+										pinInfo["electrical_type"] = "VCC";
+									} else if (ercData->eType() == ErcData::Ground) {
+										pinInfo["electrical_type"] = "Ground";
+									}
+									
+									if (ercData->currentFlow() == ErcData::Source) {
+										pinInfo["current_flow"] = "source";
+									} else if (ercData->currentFlow() == ErcData::Sink) {
+										pinInfo["current_flow"] = "sink";
+									}
+								}
+								
 								pinsArray.append(pinInfo);
 							}
 						}

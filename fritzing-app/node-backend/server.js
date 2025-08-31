@@ -346,6 +346,7 @@ const suggesting_tools = [
     },
     strict: true,
   },
+  { type: "web_search" },
 ];
 
 function add_self_observe_test({
@@ -689,7 +690,7 @@ function request_schematics() {
   if (!!schematics) {
     return {
       status: "success",
-      message: schematics.schematics_yaml,
+      message: `row connections: ${schematics.schematics_yaml} \n\n part connections: ${parts_connections}`,
       timestamp: Date.now(),
     };
   } else {
@@ -1572,6 +1573,7 @@ async function processCommand(command) {
               };
             })
         );
+        console.log("parts_connections", parts_connections);
         return {
           status: "success",
           message: JSON.stringify(schematics),
@@ -1599,6 +1601,9 @@ async function processCommand(command) {
         const message = `this is the test results that we have run. \n ${JSON.stringify(
           results
         )} \n 
+        and this is the current schematics that the said test ran on. \n <schematics_yaml> \n ${
+          schematics.schematics_yaml
+        } \n </schematics_yaml> \n <parts_connections> \n ${parts_connections} \n </parts_connections> \n
         please analyze the test results and provide a summary of the test results.
         `;
         await send_openai_message(message);
@@ -1896,10 +1901,10 @@ async function processCommand(command) {
 
           let query_text = `${message}${contextString}\n\nAdd any tests or suggestions if necessary. You can explain the test in your reply but you don't have to mention some trivial details like test_key`;
           console.log("query_text", query_text);
-          const response = await send_openai_message(query_text);
+          // const response = await send_openai_message(query_text);
         } else {
           let query_text = `${message} \n Add any tests or suggestions if necessary. You can explain the test in your reply but you don't have to mention some trivial details like test_key`;
-          const response = await send_openai_message(query_text);
+          // const response = await send_openai_message(query_text);
         }
 
         return;

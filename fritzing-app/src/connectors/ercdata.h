@@ -68,6 +68,7 @@ public:
 	bool writeToElement(QDomElement & ercElement, QDomDocument & doc);
 	constexpr EType eType() const noexcept { return m_eType; }
 	constexpr Ignore ignore() const noexcept { return m_ignore; }
+	constexpr CurrentFlow currentFlow() const noexcept { return m_currentFlow; }
 
 protected:
 	void readVoltage(QDomElement &);
