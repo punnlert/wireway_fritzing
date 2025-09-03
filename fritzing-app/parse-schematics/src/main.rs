@@ -44,6 +44,56 @@ struct Part {
     id: usize,
 }
 
+#[derive(Clone, Hash, Eq, PartialEq, Debug, Serialize)]
+struct Netlist {
+    last_id: usize,
+    nets: Vec<Net>,
+}
+
+#[derive(Clone, Hash, Eq, PartialEq, Debug, Serialize)]
+struct Net {
+    net_id: usize,
+    is_ground: bool,
+    is_power: bool,
+    parts: Vec<Part>,
+}
+
+impl Net {
+    fn new(net_id: usize) -> Self {
+        Self { net_id, is_ground: false, is_power: false, parts: Vec::new() }
+    }
+
+    fn add_parts(&mut self, parts: &HashSet<Part>) {
+        self.parts.extend(parts.clone());
+    }
+
+    fn set_ground(&mut self) {
+        self.is_ground = true;
+    }
+
+    fn set_power(&mut self) {
+        self.is_power = true;
+    }
+}
+
+impl Netlist {
+    fn new() -> Self {
+        Self {
+            last_id: 0,
+            nets: Vec::new(),
+        }
+    }
+
+    fn add_net(&mut self, net: Net) {
+        self.nets.push(net);
+    }
+
+    fn get_next_id(&mut self) -> usize {
+        self.last_id += 1;
+        self.last_id
+    }
+}
+
 impl Pin {
     fn new(row: usize) -> Self {
         Self {
@@ -90,11 +140,11 @@ impl Display for Part {
     }
 }
 
-fn generate_net_pin(element: &Element, connections: &mut Vec<Pin>) {
+fn generate_net_pin(element: &Element, netlist: &mut Netlist) {
     match element.name() {
         "netlist" => {
             element.children().for_each(|net| {
-                generate_net_pin(&net, connections);
+                generate_net_pin(&net, netlist);
             });
         }
         "net" => {
@@ -166,17 +216,27 @@ fn generate_net_pin(element: &Element, connections: &mut Vec<Pin>) {
                 return;
             }
 
-            connected_pin.iter().for_each(|pin| {
-                let mut new_pin = pin.clone();
-                new_pin.add_parts(&connected_part);
-                if connected_to_ground {
-                    new_pin.set_ground();
-                }
-                if connected_to_power {
-                    new_pin.set_power();
-                }
-                connections.push(new_pin);
-            });
+            // connected_pin.iter().for_each(|pin| {
+            //     let mut new_pin = pin.clone();
+            //     new_pin.add_parts(&connected_part);
+            //     if connected_to_ground {
+            //         new_pin.set_ground();
+            //     }
+            //     if connected_to_power {
+            //         new_pin.set_power();
+            //     }
+            //     connections.push(new_pin);
+            // });
+
+            let mut net = Net::new(netlist.get_next_id());
+            net.add_parts(&connected_part);
+            if connected_to_ground {
+                net.set_ground();
+            }
+            if connected_to_power {
+                net.set_power();
+            }
+            netlist.add_net(net);
         }
         "connector" => todo!(),
         "part" => todo!(),
@@ -192,16 +252,16 @@ fn parse_xml_string_to_yaml(xml_string: &String) {
     let root: Result<minidom::Element> = xml_string.parse();
     match root {
         Ok(xml_element) => {
-            let mut connections = Vec::new();
+            let mut netlist = Netlist::new();
 
-            generate_net_pin(&xml_element, &mut connections);
+            generate_net_pin(&xml_element, &mut netlist);
 
             let mut yaml = std::io::stdout();
 
-            for pin in connections.iter() {
+            for pin in netlist.nets.iter() {
                 let _unused = writeln!(
                     yaml,
-                    "{},",
+                    "{}\n\n",
                     serde_yml::to_string(&pin).expect("can't parse some pin")
                 );
             }
@@ -217,13 +277,13 @@ fn parse_xml_string_to_json(xml_string: &String) {
     let root: Result<minidom::Element> = xml_string.parse();
     match root {
         Ok(xml_element) => {
-            let mut connections = Vec::new();
+            let mut netlist = Netlist::new();
 
-            generate_net_pin(&xml_element, &mut connections);
+            generate_net_pin(&xml_element, &mut netlist);
 
             let mut json = std::io::stdout();
 
-            writeln!(json, "{}", serde_json::to_string(&connections).expect("can't parse some pin"));
+            writeln!(json, "{}", serde_json::to_string(&netlist).expect("can't parse some pin"));
         }
         Err(xml_error) => {
             println!("{}", xml_error);
