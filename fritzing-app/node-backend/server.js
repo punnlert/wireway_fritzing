@@ -346,7 +346,7 @@ const suggesting_tools = [
     },
     strict: true,
   },
-  { type: "web_search" },
+  // { type: "web_search" },
 ];
 
 function add_self_observe_test({
@@ -690,7 +690,7 @@ function request_schematics() {
   if (!!schematics) {
     return {
       status: "success",
-      message: `row connections: ${schematics.schematics_yaml} \n\n part connections: ${parts_connections}`,
+      message: `netlist: ${schematics.schematics_yaml} \n\n part positional connections: ${parts_connections}`,
       timestamp: Date.now(),
     };
   } else {
@@ -729,7 +729,7 @@ class EventHandler extends EventEmitter {
     try {
       // Retrieve events that are denoted with 'requires_action'
       // since these will have our tool_calls
-      console.log(event);
+      // console.log(event);
       if (event.type === "response.output_item.added") {
         if (event.item.type === "message" || event.item.type === "reasoning") {
           process.stdout.write(
@@ -1373,7 +1373,7 @@ async function send_openai_message(message) {
     if (!!schematics) {
       const update_schematics = `this is the .yaml representation of the schematics \n <schematics_yaml> \n ${
         schematics.schematics_yaml
-      } \n </schematics_yaml> \n it tells you all the components that connects to each row. \n and this is the positional connections of the parts. \n <parts_connections> \n ${JSON.stringify(
+      } \n </schematics_yaml> \n it tells you all the components that are physically connected to this net on the BlinkBoard. if it is a power net, the "is_power" will be marked as true. if it is a ground net, the "is_ground" will be marked as true. \n and this is the positional connections of the parts. \n <parts_connections> \n ${JSON.stringify(
         parts_connections
       )} \n </parts_connections>`;
 
@@ -1403,7 +1403,7 @@ async function send_openai_message(message) {
   if (schematic_file_change) {
     const update_schematics = `this is the .yaml representation of the schematics \n <schematics_yaml> \n ${
       schematics.schematics_yaml
-    } \n </schematics_yaml> \n it tells you all the components that connects to each row. \n and this is the positional connections of the parts. \n <parts_connections> \n ${JSON.stringify(
+    } \n </schematics_yaml> \n it tells you all the components that are physically connected to this net on the BlinkBoard. if it is a power net, the "is_power" will be marked as true. if it is a ground net, the "is_ground" will be marked as true. \n and this is the positional connections of the parts. \n <parts_connections> \n ${JSON.stringify(
       parts_connections
     )} \n </parts_connections>`;
 
@@ -1430,6 +1430,7 @@ async function send_openai_message(message) {
 
   const response = await openai.responses.create(create_param);
 
+  console.log(openai_chat_history);
   for await (const event of response) {
     // Also emit to event handler for internal processing
     eventHandler.emit("event", event);
@@ -1603,7 +1604,7 @@ async function processCommand(command) {
         )} \n 
         and this is the current schematics that the said test ran on. \n <schematics_yaml> \n ${
           schematics.schematics_yaml
-        } \n </schematics_yaml> \n <parts_connections> \n ${parts_connections} \n </parts_connections> \n
+        } \n </schematics_yaml> \n it tells you all the components that are physically connected to this net on the BlinkBoard. if it is a power net, the "is_power" will be marked as true. if it is a ground net, the "is_ground" will be marked as true. \n and this is the positional connections of the parts. \n <parts_connections> \n ${parts_connections} \n </parts_connections> \n
         please analyze the test results and provide a summary of the test results.
         `;
         await send_openai_message(message);
@@ -1901,10 +1902,10 @@ async function processCommand(command) {
 
           let query_text = `${message}${contextString}\n\nAdd any tests or suggestions if necessary. You can explain the test in your reply but you don't have to mention some trivial details like test_key`;
           console.log("query_text", query_text);
-          // const response = await send_openai_message(query_text);
+          const response = await send_openai_message(query_text);
         } else {
           let query_text = `${message} \n Add any tests or suggestions if necessary. You can explain the test in your reply but you don't have to mention some trivial details like test_key`;
-          // const response = await send_openai_message(query_text);
+          const response = await send_openai_message(query_text);
         }
 
         return;
