@@ -28,6 +28,7 @@
 #include <QHash> // Added for logging
 #include <QList> // Added for logging
 #include <QPointer> // Added for logging
+#include "../model/modelpart.h" // Added for ModelPart::Wire
 
 // Forward declarations for sketch-related classes
 class MainWindow;
@@ -994,11 +995,39 @@ QJsonArray BlinkBoardWidget::getPartsData() const {
     return partsArray;
   }
 
-  // Get all items in the sketch
+  // Get all items in the sketch - use scene items directly to include wires
   QList<ItemBase*> items;
+  
+  // First, get components using collectParts (this excludes wires)
   sk->collectParts(items);
   
-  // qDebug() << "Found" << items.size() << "items in sketch";
+  // Then, add wires from the scene (collectParts doesn't include them)
+  foreach (QGraphicsItem * item, sk->scene()->items()) {
+    ItemBase * pitem = dynamic_cast<ItemBase *>(item);
+    if (pitem && pitem->itemType() == ModelPart::Wire) {
+      items.append(pitem);
+    }
+  }
+  
+  qDebug() << "=== PARTS COLLECTION (INCLUDING WIRES) ===";
+  qDebug() << "Found" << items.size() << "total items (components + wires)";
+  
+  int wireCount = 0;
+  int componentCount = 0;
+  for (auto item : items) {
+    if (item) {
+      bool isWire = (item->itemType() == ModelPart::Wire);
+      if (isWire) {
+        wireCount++;
+        qDebug() << "WIRE:" << item->title() << "ID:" << item->id();
+      } else {
+        componentCount++;
+        qDebug() << "Component:" << item->title() << "ID:" << item->id();
+      }
+    }
+  }
+  qDebug() << "Total components:" << componentCount << "Total wires:" << wireCount;
+  qDebug() << "==========================================";
   
   // Create a map to track parts we've already processed
   QSet<QString> processedParts;
@@ -1022,6 +1051,14 @@ QJsonArray BlinkBoardWidget::getPartsData() const {
     partData["label"] = item->instanceTitle();
     partData["title"] = item->title();
     partData["id"] = partId;
+    
+    // Check if this is a wire item
+    bool isWire = (item->itemType() == ModelPart::Wire);
+    partData["is_wire"] = isWire;
+    
+    if (isWire) {
+      qDebug() << "Found wire item:" << item->title() << "with ID:" << partId;
+    }
     
     // Get the connections for this part
     QJsonArray rows;
@@ -1066,6 +1103,15 @@ QJsonArray BlinkBoardWidget::getPartsData() const {
           connectedItem["part_label"] = connectedPart->instanceTitle();
           connectedItem["pin_name"] = connectedConnector->connectorSharedName();
           connectedItem["pin_id"] = connectedConnector->connectorSharedID();
+          
+          // Add wire connection information
+          bool connectedToWire = (connectedPart->itemType() == ModelPart::Wire);
+          connectedItem["is_wire"] = connectedToWire;
+          
+          if (connectedToWire) {
+            qDebug() << "        Wire connection: part" << item->instanceTitle() << "pin" << connector->connectorSharedName() 
+                     << "connected to wire" << connectedPart->instanceTitle() << "pin" << connectedConnector->connectorSharedName();
+          }
           
           // qDebug() << "        Connected to part:" << connectedPart->instanceTitle() << "pin:" << connectedConnector->connectorSharedName();
         } else {

@@ -31,9 +31,7 @@ struct XMLParser {
 #[derive(Clone, Hash, Eq, PartialEq, Debug, Serialize)]
 struct Pin {
     row: usize,
-    connected_to_ground: bool,
-    connected_to_power: bool,
-    parts: Vec<Part>,
+    // parts: Vec<Part>,
 }
 
 #[derive(Clone, Hash, Eq, PartialEq, Debug, Serialize)]
@@ -52,19 +50,19 @@ struct Netlist {
 
 #[derive(Clone, Hash, Eq, PartialEq, Debug, Serialize)]
 struct Net {
-    net_id: usize,
+    row_connection_id: usize,
     is_ground: bool,
     is_power: bool,
-    parts: Vec<Part>,
+    rows: Vec<Pin>,
 }
 
 impl Net {
-    fn new(net_id: usize) -> Self {
-        Self { net_id, is_ground: false, is_power: false, parts: Vec::new() }
+    fn new(row_connection_id: usize) -> Self {
+        Self { row_connection_id, is_ground: false, is_power: false, rows: Vec::new() }
     }
 
-    fn add_parts(&mut self, parts: &HashSet<Part>) {
-        self.parts.extend(parts.clone());
+    fn add_rows(&mut self, rows: &Vec<Pin>) {
+        self.rows.extend(rows.clone());
     }
 
     fn set_ground(&mut self) {
@@ -98,23 +96,13 @@ impl Pin {
     fn new(row: usize) -> Self {
         Self {
             row,
-            connected_to_ground: false,
-            connected_to_power: false,
-            parts: Vec::new(),
+            // parts: Vec::new(),
         }
     }
 
-    fn add_parts(&mut self, parts: &HashSet<Part>) {
-        self.parts.extend(parts.clone());
-    }
-
-    fn set_ground(&mut self) {
-        self.connected_to_ground = true;
-    }
-
-    fn set_power(&mut self) {
-        self.connected_to_power = true;
-    }
+    // fn add_parts(&mut self, parts: &HashSet<Part>) {
+    //     self.parts.extend(parts.clone());
+    // }
 }
 
 impl Part {
@@ -216,20 +204,14 @@ fn generate_net_pin(element: &Element, netlist: &mut Netlist) {
                 return;
             }
 
-            // connected_pin.iter().for_each(|pin| {
-            //     let mut new_pin = pin.clone();
-            //     new_pin.add_parts(&connected_part);
-            //     if connected_to_ground {
-            //         new_pin.set_ground();
-            //     }
-            //     if connected_to_power {
-            //         new_pin.set_power();
-            //     }
-            //     connections.push(new_pin);
-            // });
+            let rows_connections = connected_pin.iter().map(|pin| {
+                let new_pin = pin.clone();
+                // new_pin.add_parts(&connected_part);
+                new_pin
+            }).collect::<Vec<Pin>>();
 
             let mut net = Net::new(netlist.get_next_id());
-            net.add_parts(&connected_part);
+            net.add_rows(&rows_connections);
             if connected_to_ground {
                 net.set_ground();
             }

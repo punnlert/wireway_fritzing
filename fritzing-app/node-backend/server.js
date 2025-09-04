@@ -26,7 +26,7 @@ Blinkboard Schematics
 
 where [51, 1] is the positive rail and [52, 1] is a negative rail. The number for the positive and negative rails are just for annotations in the code representation of the circuit. So, instead of saying [51, 1] and [52, 1], you should say "positive rail" and "negative rail". The same row of the breadboard is connected.
 
-PLEASE GIVE CLEAR, CONCISE, AND SHORT RESPONSES. assume that the student is a beginner and doesn't know any technical terms and that they need children-level of language. you may ask the user to elaborate on some of your instructions when you sense that there's room for ambiguity. Support the user's intention to learn and understand the circuit. If the user ask for confirmation if anything was correct, you can say "yes" or "no" to confirm. If you want the user to test something, you can ask them to switch to the test mode if we're not currently in the test mode.
+PLEASE GIVE CLEAR, CONCISE, AND SHORT RESPONSES. your response shouldn't be longer than 3 sentences. assume that the student is a beginner and doesn't know any technical terms and that they need children-level of language. you may ask the user to elaborate on some of your instructions when you sense that there's room for ambiguity. Support the user's intention to learn and understand the circuit. If the user ask for confirmation if anything was correct, you can say "yes" or "no" to confirm. DO NOT ADD TEST WITHOUT NECESSITY. 
 `;
 
 const openai = new OpenAI({
@@ -1371,11 +1371,13 @@ async function send_openai_message(message) {
     mode_changed = false;
 
     if (!!schematics) {
-      const update_schematics = `this is the .yaml representation of the schematics \n <schematics_yaml> \n ${
+      const update_schematics = `this is the .yaml representation of all the rows that are connected to each other \n <rows_connections_yaml> \n ${
         schematics.schematics_yaml
-      } \n </schematics_yaml> \n it tells you all the components that are physically connected to this net on the BlinkBoard. if it is a power net, the "is_power" will be marked as true. if it is a ground net, the "is_ground" will be marked as true. \n and this is the positional connections of the parts. \n <parts_connections> \n ${JSON.stringify(
+      } \n </rows_connections_yaml> \n it tells you all the rows that are connected to each other on the BlinkBoard. if it is connected to power, the "is_power" will be marked as true. if it is connected to ground, the "is_ground" will be marked as true. \n this is the positional connections of the parts. \n <parts_connections> \n ${JSON.stringify(
         parts_connections
       )} \n </parts_connections>`;
+
+      console.log("update_schematics", update_schematics);
 
       openai_chat_history.push({
         role: "developer",
@@ -1401,12 +1403,13 @@ async function send_openai_message(message) {
   }
 
   if (schematic_file_change) {
-    const update_schematics = `this is the .yaml representation of the schematics \n <schematics_yaml> \n ${
+    const update_schematics = `this is the .yaml representation of all the rows that are connected to each other \n <rows_connections_yaml> \n ${
       schematics.schematics_yaml
-    } \n </schematics_yaml> \n it tells you all the components that are physically connected to this net on the BlinkBoard. if it is a power net, the "is_power" will be marked as true. if it is a ground net, the "is_ground" will be marked as true. \n and this is the positional connections of the parts. \n <parts_connections> \n ${JSON.stringify(
+    } \n </rows_connections_yaml> \n it tells you all the rows that are connected to each other on the BlinkBoard. if it is connected to power, the "is_power" will be marked as true. if it is connected to ground, the "is_ground" will be marked as true. \n this is the positional connections of the parts. \n <parts_connections> \n ${JSON.stringify(
       parts_connections
     )} \n </parts_connections>`;
 
+    console.log("update_schematics", update_schematics);
     openai_chat_history.push({
       role: "developer",
       content: update_schematics,
@@ -1550,14 +1553,23 @@ async function processCommand(command) {
     case "update_schematics":
       try {
         schematics = await update_schematics(command.netlist);
+        // console.log(command.parts);
+        console.log("schematics", schematics);
         parts_connections = yaml.dump(
           command.parts
             .filter(
               (part) =>
                 part.part_name != "Arduino Uno (Rev3)" &&
-                part.part_name != "Half breadboard"
+                part.part_name != "Half breadboard" &&
+                part.part_name != "Wire"
             )
             .map((part) => {
+              // if (part.part_name === "Wire") {
+              //   console.log(
+              //     "Wire",
+              //     part.rows.flatMap((row) => row.connected_to)
+              //   );
+              // }
               return {
                 name: part.part_name,
                 connected_to_row: part.rows.flatMap((row) => {
@@ -1604,7 +1616,7 @@ async function processCommand(command) {
         )} \n 
         and this is the current schematics that the said test ran on. \n <schematics_yaml> \n ${
           schematics.schematics_yaml
-        } \n </schematics_yaml> \n it tells you all the components that are physically connected to this net on the BlinkBoard. if it is a power net, the "is_power" will be marked as true. if it is a ground net, the "is_ground" will be marked as true. \n and this is the positional connections of the parts. \n <parts_connections> \n ${parts_connections} \n </parts_connections> \n
+        } \n </schematics_yaml> \n it tells you all the components that are physically connected (i.e. via wires) to this net on the BlinkBoard. if it is a power net, the "is_power" will be marked as true. if it is a ground net, the "is_ground" will be marked as true. \n and this is the positional connections of the parts. \n <parts_connections> \n ${parts_connections} \n </parts_connections> \n
         please analyze the test results and provide a summary of the test results.
         `;
         await send_openai_message(message);
