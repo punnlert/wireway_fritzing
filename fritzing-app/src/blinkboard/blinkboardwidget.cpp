@@ -52,7 +52,7 @@ class ItemBase;
 #include "../items/itembase.h"
 
 BlinkBoardWidget::BlinkBoardWidget(QWidget *parent)
-    : QScrollArea(parent), m_actionButton(new QPushButton(tr("Connect to BlinkBoard"))),
+    : QScrollArea(parent), m_actionButton(new QPushButton(tr("Connect to Breadboard"))),
       m_mainLayout(new QVBoxLayout()),
       m_nodeProcess(new QProcess(this)),
       m_chatDisplay(new QTextEdit()),
@@ -608,7 +608,7 @@ void BlinkBoardWidget::handleNodeFinished(int exitCode, QProcess::ExitStatus exi
   updateButtonColor(false);
   
   // Add chat message about disconnection
-  addChatMessage("Node.js backend disconnected.", false);
+  // addChatMessage("Node.js backend disconnected.", false);
   
   // Log backend disconnection
   QJsonObject details;
@@ -1142,7 +1142,7 @@ void BlinkBoardWidget::updateButtonColor(bool isConnected) {
     // Red circle when not connected
     m_statusIndicator->setStyleSheet("QLabel { background-color: #f44336; border-radius: 4px; }");
     // Update button text to "Connect to BlinkBoard" when not connected
-    m_actionButton->setText(tr("Connect to BlinkBoard"));
+    m_actionButton->setText(tr("Connect to Breadboard"));
   }
 }
 
@@ -1151,7 +1151,7 @@ void BlinkBoardWidget::handleSerialPortsReceived(const QJsonArray &ports) {
   qDebug() << "🔌 Received" << ports.size() << "serial ports from backend";
   
   if (ports.isEmpty()) {
-    addChatMessage("No serial ports detected. Please check your BlinkBoard connection.", false);
+    // addChatMessage("No serial ports detected. Please check your BlinkBoard connection.", false);
   } else {
     QString portList = "Available serial ports:\n";
     for (const QJsonValue &value : ports) {
@@ -1173,12 +1173,12 @@ void BlinkBoardWidget::showPortSelectionDialog() {
   
   // Create a simple port selection dialog
   QDialog *dialog = new QDialog(this);
-  dialog->setWindowTitle("Select BlinkBoard Port");
+  dialog->setWindowTitle("Select BreadBoard Port");
   dialog->setModal(true);
   
   QVBoxLayout *layout = new QVBoxLayout(dialog);
   
-  QLabel *label = new QLabel("Select the serial port for your BlinkBoard:", dialog);
+  QLabel *label = new QLabel("Select the serial port for your BreadBoard:", dialog);
   layout->addWidget(label);
   
   QComboBox *portCombo = new QComboBox(dialog);
@@ -1210,9 +1210,9 @@ void BlinkBoardWidget::showPortSelectionDialog() {
 }
 
 void BlinkBoardWidget::connectToSelectedPort(const QString &portPath) {
-  qDebug() << "🔌 Connecting to BlinkBoard on port:" << portPath;
+  qDebug() << "🔌 Connecting to Breadboard on port:" << portPath;
   
-  addChatMessage(QString("Connecting to BlinkBoard on %1...").arg(portPath), false);
+  // addChatMessage(QString("Connecting to BlinkBoard on %1...").arg(portPath), false);
   
   // Send connection command to backend with selected port
   QJsonObject jsonCommand;
@@ -1243,7 +1243,7 @@ void BlinkBoardWidget::handleBlinkBoardConnectionRequest() {
       showPortSelectionDialog();
     }
   } else {
-    addChatMessage("Cannot connect to BlinkBoard - Node.js backend not running", false);
+    // addChatMessage("Cannot connect to Breadboard - Node.js backend not running", false);
   }
 }
 
@@ -1860,7 +1860,7 @@ void BlinkBoardWidget::handleSaveLogs() {
   saveLogsToFile();
   
   // Provide user feedback
-  addChatMessage("📝 Logs saved successfully!", false);
+  // addChatMessage("📝 Logs saved successfully!", false);
   
   // Update button text temporarily to show success
   QString originalText = "Save Logs (0)";

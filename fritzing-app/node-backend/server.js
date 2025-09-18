@@ -26,7 +26,11 @@ Blinkboard Schematics
 
 where [51, 1] is the positive rail and [52, 1] is a negative rail. The number for the positive and negative rails are just for annotations in the code representation of the circuit. So, instead of saying [51, 1] and [52, 1], you should say "positive rail" and "negative rail". The same row of the breadboard is connected.
 
-PLEASE GIVE CLEAR, CONCISE, AND SHORT RESPONSES. your response shouldn't be longer than 3 sentences. assume that the student is a beginner and doesn't know any technical terms and that they need children-level of language. you may ask the user to elaborate on some of your instructions when you sense that there's room for ambiguity. Support the user's intention to learn and understand the circuit. If the user ask for confirmation if anything was correct, you can say "yes" or "no" to confirm. DO NOT ADD TEST WITHOUT NECESSITY. 
+PLEASE GIVE CLEAR, CONCISE, AND SHORT RESPONSES. your response shouldn't be longer than 3 sentences. assume that the student is a beginner and doesn't know any technical terms and that they need children-level of language. you may ask the user to elaborate on some of your instructions when you sense that there's room for ambiguity. Support the user's intention to learn and understand the circuit. If the user ask for confirmation if anything was correct, you can say "yes" or "no" to confirm.
+
+If have a problem with the circuit, check the schematics first by calling the request_schematics function. If nothing's wrong, ask the user to check the wiring.
+
+DO NOT ADD TEST WITHOUT NECESSITY.
 `;
 
 const openai = new OpenAI({
@@ -346,7 +350,7 @@ const suggesting_tools = [
     },
     strict: true,
   },
-  // { type: "web_search" },
+  { type: "web_search" },
 ];
 
 function add_self_observe_test({
@@ -1553,6 +1557,7 @@ async function processCommand(command) {
     case "update_schematics":
       try {
         schematics = await update_schematics(command.netlist);
+        // Save command.netlist and parts_connections to a text file in the root directory
         // console.log(command.parts);
         console.log("schematics", schematics);
         parts_connections = yaml.dump(
@@ -1560,16 +1565,16 @@ async function processCommand(command) {
             .filter(
               (part) =>
                 part.part_name != "Arduino Uno (Rev3)" &&
-                part.part_name != "Half breadboard" &&
-                part.part_name != "Wire"
+                part.part_name != "Half breadboard"
+              // part.part_name != "Wire"
             )
             .map((part) => {
-              // if (part.part_name === "Wire") {
-              //   console.log(
-              //     "Wire",
-              //     part.rows.flatMap((row) => row.connected_to)
-              //   );
-              // }
+              if (part.part_name === "Wire") {
+                console.log(
+                  `wire: ${part.label}`,
+                  part.rows.flatMap((row) => row.connected_to)
+                );
+              }
               return {
                 name: part.part_name,
                 connected_to_row: part.rows.flatMap((row) => {
@@ -1586,6 +1591,34 @@ async function processCommand(command) {
               };
             })
         );
+        try {
+          const outputFilePath = path.join(
+            __dirname,
+            "../schematics_debug.txt"
+          );
+          let fileContent = "";
+          fileContent += "=== command.netlist ===\n";
+          fileContent +=
+            (typeof command.netlist === "string"
+              ? command.netlist
+              : JSON.stringify(command.netlist, null, 2)) + "\n\n";
+          fileContent += "=== command.parts ===\n";
+          fileContent +=
+            (typeof schematics === "string"
+              ? schematics
+              : JSON.stringify(schematics.schematics_yaml, null, 2)) + "\n\n";
+          fileContent += "=== parts_connections ===\n";
+          fileContent +=
+            (typeof parts_connections === "string"
+              ? parts_connections
+              : JSON.stringify(parts_connections, null, 2)) + "\n";
+          fs.writeFileSync(outputFilePath, fileContent, "utf8");
+          console.log(
+            `Saved schematics and parts_connections to ${outputFilePath}`
+          );
+        } catch (err) {
+          console.error("Failed to write schematics_debug.txt:", err);
+        }
         console.log("parts_connections", parts_connections);
         return {
           status: "success",

@@ -62,7 +62,7 @@ void MainWindow::createDockWindows() {
   makeDock(BinManager::Title, m_binManager, PartsBinMinHeight,
            PartsBinHeightDefault /*, Qt::LeftDockWidgetArea*/);
 
-  makeDock(tr("BlinkBoard Connection"), m_blinkboardWidget.data(),
+  makeDock(tr("Breadboard Connection"), m_blinkboardWidget.data(),
            BlinkBoardWidgetMinHeight, BlinkBoardWidgetDefaultHeight)
       ->hide();
 
