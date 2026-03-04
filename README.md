@@ -1,3 +1,4 @@
+all the fritzing application build follows this [blog post](https://siytek.com/build-fritzing/)
 ## Dependencies
 - cmake: which u can install using `brew install cmake`
 - libgit2
