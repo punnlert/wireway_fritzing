@@ -1559,14 +1559,132 @@ async function processCommand(command) {
         schematics = await update_schematics(command.netlist);
         // Save command.netlist and parts_connections to a text file in the root directory
         // console.log(command.parts);
-        console.log("schematics", schematics);
+        console.log("schematics", command.parts);
+        // Build adjacency of connectors across all parts to traverse wire segments
+        const partsById = new Map(
+          (command.parts || []).map((p) => [String(p.id), p])
+        );
+
+        const nodeKey = (partId, pinId) => `${partId}|${pinId}`;
+
+        const adjacency = new Map();
+
+        const ensureNode = (key) => {
+          if (!adjacency.has(key)) adjacency.set(key, []);
+          return adjacency.get(key);
+        };
+
+        // Create undirected graph edges between every pair of connected connectors
+        for (const part of command.parts || []) {
+          const partId = String(part.id);
+          const partLabel = part.label;
+          for (const row of part.rows || []) {
+            const fromKey = nodeKey(partId, row.pin_id);
+            ensureNode(fromKey);
+            for (const ct of row.connected_to || []) {
+              const toPartId = String(ct.part_id);
+              const toKey = nodeKey(toPartId, ct.pin_id);
+              // forward edge (label from connected_to)
+              ensureNode(fromKey).push({
+                part_id: toPartId,
+                pin_id: ct.pin_id,
+                part_label: ct.part_label,
+              });
+              // reverse edge (label derived from current part)
+              ensureNode(toKey).push({
+                part_id: partId,
+                pin_id: row.pin_id,
+                part_label: partLabel,
+              });
+            }
+          }
+          // If this is a wire, link its own connectors together (internal continuity)
+          if (part.part_name === "Wire") {
+            const pins = (part.rows || []).map((r) => r.pin_id).filter(Boolean);
+            for (let i = 0; i < pins.length; i++) {
+              for (let j = i + 1; j < pins.length; j++) {
+                const aKey = nodeKey(partId, pins[i]);
+                const bKey = nodeKey(partId, pins[j]);
+                ensureNode(aKey).push({
+                  part_id: partId,
+                  pin_id: pins[j],
+                  part_label: partLabel,
+                });
+                ensureNode(bKey).push({
+                  part_id: partId,
+                  pin_id: pins[i],
+                  part_label: partLabel,
+                });
+              }
+            }
+          }
+        }
+
+        const isWirePart = (pid) => {
+          const p = partsById.get(String(pid));
+          return p && p.part_name === "Wire";
+        };
+
+        const isBreadboard = (pid, labelHint) => {
+          if (labelHint === "Breadboard1") return true;
+          const p = partsById.get(String(pid));
+          return p && p.label === "Breadboard1";
+        };
+
+        // Traverse only through wires, collect reachable breadboard rows
+        const resolveBreadboardRows = (startPartId, startPinId) => {
+          const visited = new Set();
+          const queue = [
+            {
+              part_id: String(startPartId),
+              pin_id: startPinId,
+              part_label: partsById.get(String(startPartId))?.label,
+            },
+          ];
+          const rows = new Set();
+
+          while (queue.length) {
+            const current = queue.shift();
+            if (!current) break;
+            const key = nodeKey(current.part_id, current.pin_id);
+            if (visited.has(key)) continue;
+            visited.add(key);
+
+            const neighbors = adjacency.get(key) || [];
+            for (const nei of neighbors) {
+              const neiKey = nodeKey(nei.part_id, nei.pin_id);
+              if (visited.has(neiKey)) continue;
+
+              if (isBreadboard(nei.part_id, nei.part_label)) {
+                // Convert breadboard pin id to row number
+                try {
+                  const rowNum = convert_pinname_to_row_num(nei.pin_id);
+                  rows.add(rowNum);
+                } catch (e) {
+                  // ignore conversion errors
+                }
+                continue;
+              }
+
+              if (isWirePart(nei.part_id)) {
+                queue.push({
+                  part_id: String(nei.part_id),
+                  pin_id: nei.pin_id,
+                  part_label: nei.part_label,
+                });
+              }
+            }
+          }
+
+          return Array.from(rows.values());
+        };
+
         parts_connections = yaml.dump(
           command.parts
             .filter(
               (part) =>
-                part.part_name != "Arduino Uno (Rev3)" &&
-                part.part_name != "Half breadboard"
-              // part.part_name != "Wire"
+                // part.part_name != "Arduino Uno (Rev3)" &&
+                part.part_name != "Half breadboard" && part.part_name != "Wire"
             )
             .map((part) => {
               if (part.part_name === "Wire") {
@@ -1575,22 +1693,24 @@ async function processCommand(command) {
                   part.rows.flatMap((row) => row.connected_to)
                 );
               }
+              if (part.part_name === "Arduino Uno (Rev3)") {
+                console.log("Arduino Uno (Rev3)", part.rows);
+              }
               return {
                 name: part.part_name,
                 connected_to_row: part.rows.flatMap((row) => {
-                  return row.connected_to
-                    .filter((part) => part.part_label === "Breadboard1")
-                    .map((part) => {
-                      return `pin: ${
-                        row.pin_name
-                      } -> row: ${convert_pinname_to_row_num(part.pin_id)}`;
-                    });
+                  // Combine through wire segments to all terminal breadboard rows
+                  const rows = resolveBreadboardRows(part.id, row.pin_id);
+                  return rows.map(
+                    (r) => `pin: ${row.pin_name} \u2192 row: ${r}`
+                  );
                 }),
                 id: part.id,
                 label: part.label,
               };
             })
         );
+        console.log("parts_connections", parts_connections);
         try {
           const outputFilePath = path.join(
             __dirname,
