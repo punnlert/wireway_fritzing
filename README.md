@@ -1,6 +1,6 @@
 all the fritzing application build follows this [blog post](https://siytek.com/build-fritzing/)
 ## Dependencies
-- cmake: which u can install using `brew install cmake`
+- cmake: which u can install using `brew install cmake` or if you dont have brew then `/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"`
 - libgit2
 - boost
 
