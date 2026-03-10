@@ -88,6 +88,10 @@ macx {
     #QMAKE_MAC_SDK = macosx10.11            # uncomment/adapt for your version of OSX
     CONFIG += arm64 # x86 ppc
     QMAKE_INFO_PLIST = FritzingInfo.plist
+
+    # [punn] important if want to compile on macos with no AGL
+    QMAKE_LIBS_OPENGL = -framework OpenGL
+
     #DEFINES += QT_NO_DEBUG                # uncomment this for xcode
     LIBS += -lz
 #    LIBS += /usr/lib/libz.dylib
