@@ -36,7 +36,8 @@ download it whatever way you prefer [here](https://doc.qt.io/qtcreator/creator-h
 
 you're gonna get a maintainance tool app for Qt (if cannot find, it's probably in ~/Qt/MaintainanceTool.app)
 
-You should install qt version 5.15.19
+You should install the latest qt version
+in my case i chose 5.15.19
 select the following
 
 ![qt packages to install](./imgs/qt_deps.png)
