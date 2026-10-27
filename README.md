@@ -48,6 +48,14 @@ navigate to `./fritzing-app/node-backend` and make a file named `.env`
 then put your OpenAI credentials in with the name
 OPENAI_API_KEY=<your api key>
 
+### Building the Rust Parser
+head to `fritzing-app/parse-schematics`
+
+run
+```
+cargo build --release
+```
+
 ## To start fritzing application
 
 1. start QT creator and select "Open Project"
